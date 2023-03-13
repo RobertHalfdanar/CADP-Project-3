@@ -2,12 +2,24 @@ package Utils
 
 import "unicode"
 
-// HasPunctuation returns true if the string contains any punctuation
-func HasPunctuation(s string) bool {
+// IsValidCommand returns true if the string is a valid command
+// A valid command is a string that does not contain any punctuation except dashes and underscores
+func IsValidCommand(s string) bool {
 	for _, r := range s {
+		// Spaces are not allowed
+		if r == ' ' {
+			return false
+		}
+
+		// Allow dashes and underscores
+		if r == '-' || r == '_' {
+			continue
+		}
+
 		if unicode.IsPunct(r) {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
+

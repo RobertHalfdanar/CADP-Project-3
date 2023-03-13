@@ -59,7 +59,7 @@ func commandsHandler(cmd string) {
 
 	cmd = strings.TrimSpace(cmd)
 
-	if Utils.HasPunctuation(cmd) {
+	if !Utils.IsValidCommand(cmd) {
 		fmt.Println("\u001B[31mCommand cannot contain punctuation\u001B[0m")
 		return
 	}
