@@ -5,6 +5,7 @@ import (
 	"CADP-Project-3/Raft"
 	"CADP-Project-3/Utils"
 	"bufio"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -103,6 +104,25 @@ func (state *State) Init() {
 	}
 }
 
+func (state *State) Send() {
+	Logger.Log(Logger.INFO, "Server sending...")
+	for {
+		time.Sleep(5 * time.Second)
+
+		for _, addr := range state.Servers {
+			if addr.String() == state.MyName {
+				continue
+			} // Don't send to self
+			msg := &Raft.Raft{Message: nil}
+			err := Utils.WriteToUDPConn(state.Listener, addr, msg)
+
+			if err != nil {
+				Logger.Log(Logger.WARNING, "Failed to send to host")
+			}
+		}
+	}
+}
+
 // This is the server loop
 func (state *State) Server() {
 	// TODO: Configure timeouts, read from the UDP connection, handle incoming messages and update state.
@@ -134,22 +154,16 @@ func (state *State) Server() {
 
 func (state *State) repl() {
 	// TODO: Continuously read from stdin and handle the commands.
-	Logger.Log(Logger.INFO, "Server sending...")
-
+	reader := bufio.NewReader(os.Stdin)
 	for {
-		time.Sleep(5 * time.Second)
-
-		for _, addr := range state.Servers {
-			if addr.String() == state.MyName {
-				continue
-			} // Don't send to self
-			msg := &Raft.Raft{Message: nil}
-			err := Utils.WriteToUDPConn(state.Listener, addr, msg)
-
-			if err != nil {
-				Logger.Log(Logger.WARNING, "Failed to send to host")
-			}
+		fmt.Print("Command> ")
+		cmd, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println(err)
+			break
 		}
+
+		fmt.Println(cmd)
 	}
 }
 
@@ -169,5 +183,6 @@ func Start() {
 
 	state.Init()
 	go state.Server()
+	go state.Send()
 	state.repl()
 }
