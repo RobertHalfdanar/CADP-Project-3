@@ -1,6 +1,7 @@
 package Server
 
 import (
+	"CADP-Project-3/Logger"
 	"CADP-Project-3/Raft"
 	"CADP-Project-3/Utils"
 	"net"
@@ -11,6 +12,8 @@ func (state *State) commandMessageHandler(command string) {
 }
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
+	Logger.Log(Logger.INFO, "Handling request vote message...")
+
 	raftResponse := &Raft.RequestVoteResponse{}
 	raftResponse.Term = state.CurrentTerm
 
@@ -42,6 +45,12 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	envelope.Message = &Raft.Raft_RequestVoteResponse{RequestVoteResponse: raftResponse}
 
 	state.sendTo(address, envelope)
+
+	if raftResponse.VoteGranted {
+		Logger.Log(Logger.INFO, "Request vote handled with vote granted")
+	} else {
+		Logger.Log(Logger.INFO, "Request vote handled with vote not granted")
+	}
 }
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {

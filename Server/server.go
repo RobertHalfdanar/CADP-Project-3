@@ -93,13 +93,13 @@ func (state *State) Init() {
 	}
 
 	state.MyName = os.Args[1]
+	state.MyAddress = Utils.CreateUDPAddr(state.MyName)
 
 	fileName := os.Args[2]
 	state.setServers(fileName)
 
 	var err error
 	state.Listener, err = Utils.CreateUDPListener(state.MyName)
-
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to create a udp listener!")
 		os.Exit(-1)
@@ -154,9 +154,9 @@ func (state *State) Server() {
 			continue
 		}
 
+		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		state.messagesHandler(msg, address)
 
-		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		// Logger.LogWithHost(Logger.INFO, address, "Received message")
 	}
 }
@@ -217,6 +217,8 @@ func (state *State) startLeaderElection() {
 func (state *State) repl() {
 	// TODO: Continuously read from stdin and handle the commands.
 	reader := bufio.NewReader(os.Stdin)
+	for {
+	}
 	for {
 		fmt.Print("Command> ")
 		cmd, err := reader.ReadString('\n')
