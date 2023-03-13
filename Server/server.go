@@ -146,14 +146,34 @@ func (state *State) Server() {
 
 			continue
 		}
+
+		// I dont know what this is for
 		failures = 0
+
+		state.messagesHandler(msg, address)
 
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		// Logger.LogWithHost(Logger.INFO, address, "Received message")
 	}
 }
 
+func (state *State) sendToAll(message *Raft.Raft) {
+	for _, addr := range state.Servers {
+		if addr.String() == state.MyName {
+			continue
+		} // Don't send to self
+
+		err := Utils.WriteToUDPConn(state.Listener, addr, message)
+
+		if err != nil {
+			Logger.Log(Logger.WARNING, "Failed to send to host")
+		}
+	}
+}
+
 func (state *State) startLeaderElection() {
+	Logger.Log(Logger.INFO, "Starting leader election...")
+
 	// I am starting a new election
 	state.CurrentTerm++
 	state.state = Candidate
@@ -167,10 +187,9 @@ func (state *State) startLeaderElection() {
 		LastLogTerm:   0, // TODO: This should not be zero
 	},
 	}}
-	
-	fmt.Println(message)
 
-	// state.Send()
+	Logger.Log(Logger.INFO, "Sending request vote to all other servers")
+	state.sendToAll(message)
 
 	// TODO: I win the election
 
