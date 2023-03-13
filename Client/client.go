@@ -29,7 +29,7 @@ func (node *Server) Send(msg *Raft.Raft) {
 	}
 
 	// Send the message to the server
-	err = Utils.WriteToConn(conn, msg)
+	err = Utils.WriteToUDPConn(conn, node.Addr, msg)
 
 	if err != nil {
 		fmt.Println("\u001B[31mFailed to send to host\u001B[0m")
@@ -42,7 +42,10 @@ var server = Server{}
 
 // exitCommandHandler handles the exit command
 func exitCommandHandler() {
+	// TODO:
 	fmt.Println("exit command")
+
+	os.Exit(0)
 }
 
 // sendCommandHandler handles all other commands and sends them to the server
