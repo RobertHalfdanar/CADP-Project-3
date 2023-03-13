@@ -163,6 +163,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+.idea/*
 
 Logs
 
