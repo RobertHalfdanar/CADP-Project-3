@@ -54,6 +54,8 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 }
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
+	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
+
 	// Remove the server that has voted
 	state.leftToVote = Utils.Remove(state.leftToVote, address)
 
@@ -65,6 +67,8 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	if state.votes < len(state.Servers)/2 {
 		return
 	}
+
+	Logger.Log(Logger.INFO, "I am the leader!")
 
 	state.state = Leader
 

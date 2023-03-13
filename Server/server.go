@@ -187,9 +187,10 @@ func (state *State) startLeaderElection() {
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
 	// Every time we start a new election we reset the server that have not voted yet
-	copy(state.leftToVote, state.Servers)
+	state.leftToVote = state.Servers
+	// I have voted for me, so remove me
+	state.leftToVote = Utils.Remove(state.leftToVote, state.MyAddress)
 
-	// I am starting a new election
 	state.CurrentTerm++
 	state.state = Candidate
 	state.VotedFor = state.MyAddress

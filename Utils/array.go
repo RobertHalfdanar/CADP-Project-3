@@ -1,6 +1,8 @@
 package Utils
 
-import "net"
+import (
+	"net"
+)
 
 // WrapIndex receives and index and a length and returns the index if it is in the range of the length
 // otherwise wraps the index around the array
@@ -24,7 +26,7 @@ func Contains(e []*net.UDPAddr, item *net.UDPAddr) bool {
 
 func Find(s []*net.UDPAddr, e *net.UDPAddr) int {
 	for i, a := range s {
-		if a == e {
+		if a.String() == e.String() {
 			return i
 		}
 	}
@@ -33,6 +35,10 @@ func Find(s []*net.UDPAddr, e *net.UDPAddr) int {
 
 func Remove(s []*net.UDPAddr, e *net.UDPAddr) []*net.UDPAddr {
 	index := Find(s, e)
+
+	if index == -1 {
+		return s
+	}
 
 	s[index] = s[len(s)-1]
 	return s[:len(s)-1]
