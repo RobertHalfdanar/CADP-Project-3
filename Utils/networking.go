@@ -24,8 +24,8 @@ func GetPortFromListener(conn net.Listener) int32 {
 // GetRemotePortAndIPFromConn gets the IP address and port of a
 // specified connection that we are connected to
 func GetRemotePortAndIPFromConn(conn net.Conn) (net.IP, int32) {
-	port := conn.RemoteAddr().(*net.TCPAddr).Port
-	ip := conn.RemoteAddr().(*net.TCPAddr).IP
+	port := conn.RemoteAddr().(*net.UDPAddr).Port
+	ip := conn.RemoteAddr().(*net.UDPAddr).IP
 
 	return ip, int32(port)
 }
@@ -123,7 +123,6 @@ func CreateUDPAddr(address string) *net.UDPAddr {
 
 	udpAddress.IP = net.ParseIP(ip)
 	udpAddress.Port = int(port)
-
 	return udpAddress
 }
 
