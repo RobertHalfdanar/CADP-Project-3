@@ -1,38 +1,87 @@
 package Server
 
-import "CADP-Project-3/Raft"
+import (
+	"CADP-Project-3/Raft"
+	"CADP-Project-3/Utils"
+	"net"
+)
 
-func commandMessageHandler(command string) {
-
-}
-
-func requestVoteMessageHandler(request *Raft.RequestVoteRequest) {
-
-}
-
-func requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse) {
+func (state *State) commandMessageHandler(command string) {
 
 }
 
-func appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
+func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
+	raftResponse := &Raft.RequestVoteResponse{}
+	raftResponse.Term = state.CurrentTerm
+
+	if state.CurrentTerm >= request.Term {
+		// If the request term is less than the current term, then we reject the request
+		raftResponse.VoteGranted = false
+
+	} else if state.CurrentTerm == request.Term && state.state == Candidate {
+		// If the request term is equal to the current term, and we are a candidate, then we reject the request
+		// I vote for myself and can only vote for one candidate
+		raftResponse.VoteGranted = false
+
+	} else if state.LastApplied > request.LastLogIndex {
+		// If our log index is large then the request log index, then we reject the request
+		// I have more logs
+		raftResponse.VoteGranted = false
+
+	} else {
+		// We vote for the candidate
+
+		state.CurrentTerm = request.Term
+		state.state = Follower
+		state.VotedFor = address
+
+		raftResponse.VoteGranted = true
+	}
+
+	envelope := &Raft.Raft{}
+	envelope.Message = &Raft.Raft_RequestVoteResponse{RequestVoteResponse: raftResponse}
+
+	state.sendTo(address, envelope)
+}
+
+func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
+	// Remove the server that has voted
+	state.leftToVote = Utils.Remove(state.leftToVote, address)
+
+	if response.VoteGranted {
+		// If the server has voted for us, then we increment the number of votes
+		state.votes++
+	}
+
+	if state.votes < len(state.Servers)/2 {
+		return
+	}
+
+	state.state = Leader
+
+	// Send an message to all other servers
+	state.Send()
+}
+
+func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
 
 }
 
-func appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {
+func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {
 
 }
 
-func messagesHandler(raft *Raft.Raft) {
+func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
 	switch v := raft.Message.(type) {
 	case *Raft.Raft_CommandName:
-		commandMessageHandler(v.CommandName)
+		state.commandMessageHandler(v.CommandName)
 	case *Raft.Raft_RequestVoteRequest:
-		requestVoteMessageHandler(v.RequestVoteRequest)
+		state.requestVoteMessageHandler(v.RequestVoteRequest, address)
 	case *Raft.Raft_RequestVoteResponse:
-		requestVoteResponseMessageHandler(v.RequestVoteResponse)
+		state.requestVoteResponseMessageHandler(v.RequestVoteResponse, address)
 	case *Raft.Raft_AppendEntriesRequest:
-		appendEntriesRequestMessageHandler(v.AppendEntriesRequest)
+		state.appendEntriesRequestMessageHandler(v.AppendEntriesRequest)
 	case *Raft.Raft_AppendEntriesResponse:
-		appendEntriesResponseMessageHandler(v.AppendEntriesResponse)
+		state.appendEntriesResponseMessageHandler(v.AppendEntriesResponse)
 	}
 }

@@ -48,6 +48,7 @@ type State struct {
 	Servers   []*net.UDPAddr // List of all servers
 
 	votes             int                          // Did the server get votes?
+	leftToVote        []*net.UDPAddr               // How has voted
 	lastAppendRequest []*Raft.AppendEntriesRequest // Did we get a response?
 }
 
@@ -157,6 +158,14 @@ func (state *State) Server() {
 	}
 }
 
+func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
+	err := Utils.WriteToUDPConn(state.Listener, addr, message)
+
+	if err != nil {
+		Logger.Log(Logger.WARNING, "Failed to send to host")
+	}
+}
+
 func (state *State) sendToAll(message *Raft.Raft) {
 	for _, addr := range state.Servers {
 		if addr.String() == state.MyName {
@@ -174,10 +183,14 @@ func (state *State) sendToAll(message *Raft.Raft) {
 func (state *State) startLeaderElection() {
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
+	// Every time we start a new election we reset the server that have not voted yet
+	copy(state.leftToVote, state.Servers)
+
 	// I am starting a new election
 	state.CurrentTerm++
 	state.state = Candidate
 	state.VotedFor = state.MyAddress
+	state.votes = 1
 
 	// Issue a request vote to all other servers
 	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
@@ -232,6 +245,5 @@ func Start() {
 
 	state.Init()
 	go state.Server()
-	go state.Send()
 	state.repl()
 }
