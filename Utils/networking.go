@@ -1,8 +1,8 @@
 package Utils
 
 import (
-	"Project_2/Logger"
-	"Project_2/minichord"
+	"CADP-Project-3/Logger"
+	"CADP-Project-3/Raft"
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"net"
@@ -63,6 +63,70 @@ func CreatingTCPListener(address string) net.Listener {
 	return listenerConn
 }
 
+func CreateUDPListener(address string) (*net.UDPConn, error) {
+	Logger.Log(Logger.INFO, "Creating a UDP listener...")
+
+	listenerConn, err := net.ListenUDP("udp4", CreateUDPAddr(address))
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Logger.Log(Logger.INFO, "TCP listener created on port: "+strconv.Itoa(int(GetPortFromListener(listenerConn))))
+
+	return listenerConn, nil
+
+}
+
+func ReadFromUDPConn(conn *net.UDPConn, msg *Raft.Raft) (*net.UDPAddr, error) {
+	buffer := make([]byte, 65535)
+	length, address, err := conn.ReadFromUDP(buffer)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = proto.Unmarshal(buffer[:length], msg)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return address, nil
+}
+
+func WriteToUDPConn(conn *net.UDPConn, addr *net.UDPAddr, msg *Raft.Raft) error {
+	msgByte, err := proto.Marshal(msg)
+	if err != nil {
+		Logger.Log(Logger.ERROR, "Failed to marshal: "+err.Error())
+		return err
+	}
+
+	_, err = conn.WriteToUDP(msgByte, addr)
+
+	if err != nil {
+		Logger.Log(Logger.ERROR, "Failed to send to conn: "+err.Error())
+		return err
+	}
+
+	// Logger.LogWithHost(Logger.INFO, host, "Message sent")
+
+	return nil
+
+}
+
+func CreateUDPAddr(address string) *net.UDPAddr {
+
+	ip, port := ToIPAndPort(address)
+
+	udpAddress := new(net.UDPAddr)
+
+	udpAddress.IP = net.ParseIP(ip)
+	udpAddress.Port = int(port)
+
+	return udpAddress
+}
+
 // ToAddress converts IP and Port into a string represented like so IP:PORT
 func ToAddress(ip string, port int32) string {
 	return fmt.Sprintf(ip+":%d", port)
@@ -90,7 +154,7 @@ func ToIPAndPort(address string) (string, int32) {
 
 // ReadFromConn listens for a message to a specified conn and unmarshal it into the msg pointer
 // User then uses the msg pointer to read what was sent
-func ReadFromConn(conn net.Conn, msg *minichord.MiniChord) error {
+func ReadFromConn(conn net.Conn, msg *Raft.Raft) error {
 	host := GetRemoteHostFromConn(conn)
 	Logger.LogWithHost(Logger.INFO, host, "Listening...")
 
@@ -120,7 +184,7 @@ func ReadFromConn(conn net.Conn, msg *minichord.MiniChord) error {
 }
 
 // WriteToConn sends a specified message to a specified connection.
-func WriteToConn(conn net.Conn, message *minichord.MiniChord) error {
+func WriteToConn(conn net.Conn, message *Raft.Raft) error {
 	// Getting the host just for our logger
 	host := GetRemoteHostFromConn(conn)
 

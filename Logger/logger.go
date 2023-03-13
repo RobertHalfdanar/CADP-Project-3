@@ -92,6 +92,10 @@ func PrintLogs() {
 	}
 }
 
+func printLog(message string) {
+	fmt.Println(message)
+}
+
 // Log is the main log function that should be used
 // Takes a log level which can be INFO, WARNING, or ERROR and a message
 // and writes it into the log file
@@ -100,8 +104,8 @@ func Log(level LogLevel, message string) {
 
 	// Prints the log message to the terminal with colors for the levels
 	// Currently disabled because we are getting inputs from the users
-	// colorFormattedMessage := logFormatter(message, "NULL", level, true)
-	// printLog(colorFormattedMessage)
+	colorFormattedMessage := logFormatter(message, "NULL", level, true)
+	printLog(colorFormattedMessage)
 
 	writeLog(formattedMessage)
 }
