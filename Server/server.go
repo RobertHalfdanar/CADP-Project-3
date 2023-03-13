@@ -153,6 +153,32 @@ func (state *State) Server() {
 	}
 }
 
+func (state *State) startLeaderElection() {
+	// I am starting a new election
+	state.CurrentTerm++
+	state.state = Candidate
+	state.VotedFor = state.MyAddress
+
+	// Issue a request vote to all other servers
+	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
+		Term:          state.CurrentTerm,
+		CandidateName: state.MyName,
+		LastLogIndex:  0, // TODO: This should not be zero
+		LastLogTerm:   0, // TODO: This should not be zero
+	},
+	}}
+	
+	fmt.Println(message)
+
+	// state.Send()
+
+	// TODO: I win the election
+
+	// TODO: Another server establishes itself as leader
+
+	// TODO: a period of time goes by with no winner
+}
+
 func (state *State) repl() {
 	// TODO: Continuously read from stdin and handle the commands.
 	reader := bufio.NewReader(os.Stdin)
