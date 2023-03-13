@@ -1,4 +1,4 @@
-package Node
+package Server
 
 import (
 	"CADP-Project-3/Raft"
@@ -14,7 +14,7 @@ const (
 	ElectionTimeout = 20 * BroadcastTime
 )
 
-// States of the Node, cf figure 4
+// States of the Server, cf figure 4
 type RaftState int
 
 const (

@@ -5,8 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e0962b71-f3d4-438c-ac4c-ef44de5d45aa" name="Changes" comment="chore: Added utils functions">
-      <change beforePath="$PROJECT_DIR$/Server/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/Node/node.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/raftserver.go" beforeDir="false" afterPath="$PROJECT_DIR$/raftserver.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Node/node.go" beforeDir="false" afterPath="$PROJECT_DIR$/Server/server.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -20,7 +21,10 @@
       </list>
     </option>
   </component>
-  <component name="GOROOT" url="file://$PROJECT_DIR$/../../../../../../Program Files/Go" />
+  <component name="GOROOT" url="file://$PROJECT_DIR$/../../../Program Files/Go" />
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
@@ -39,6 +43,7 @@
     &quot;RunOnceActivity.go.migrated.go.modules.settings&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;go.import.settings.migrated&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/HR/CADP/Project 3&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -46,6 +51,27 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
+  <component name="RunManager">
+    <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
+      <module name="CADP-Project-3" />
+      <working_directory value="$PROJECT_DIR$" />
+      <go_parameters value="-i" />
+      <kind value="FILE" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="GoTestRunConfiguration" factoryName="Go Test">
+      <module name="CADP-Project-3" />
+      <working_directory value="$PROJECT_DIR$" />
+      <go_parameters value="-i" />
+      <kind value="DIRECTORY" />
+      <directory value="$PROJECT_DIR$" />
+      <filePath value="$PROJECT_DIR$" />
+      <framework value="gotest" />
+      <method v="2" />
+    </configuration>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -55,7 +81,7 @@
       <option name="presentableId" value="Default" />
       <updated>1678663069472</updated>
       <workItem from="1678663070738" duration="933000" />
-      <workItem from="1678715001399" duration="104000" />
+      <workItem from="1678715159041" duration="370000" />
     </task>
     <task id="LOCAL-00001" summary="chore: Initial commit">
       <created>1678663296859</created>
