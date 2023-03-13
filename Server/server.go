@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -163,7 +164,10 @@ func (state *State) repl() {
 			break
 		}
 
-		fmt.Println(cmd)
+		// Remove leading and trailing whitespace
+		cmd = strings.TrimSpace(cmd)
+
+		commandsHandler(cmd)
 	}
 }
 
