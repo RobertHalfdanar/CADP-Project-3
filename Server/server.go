@@ -147,9 +147,12 @@ func (state *State) Server() {
 
 			continue
 		}
-
-		// I dont know what this is for
 		failures = 0
+
+		if !Utils.Contains(state.Servers, address) {
+			Logger.Log(Logger.WARNING, "Unknown address received!")
+			continue
+		}
 
 		state.messagesHandler(msg, address)
 

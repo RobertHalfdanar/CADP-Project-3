@@ -13,9 +13,9 @@ func WrapIndex(index int, length int) int {
 	return index
 }
 
-func Contains(e []int32, item int32) bool {
+func Contains(e []*net.UDPAddr, item *net.UDPAddr) bool {
 	for _, a := range e {
-		if a == item {
+		if a.String() == item.String() {
 			return true
 		}
 	}
