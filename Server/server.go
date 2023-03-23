@@ -104,6 +104,7 @@ func (state *State) setServers(fileName string) {
 	for scanner.Scan() {
 
 		address := scanner.Text()
+
 		state.Servers = append(state.Servers, Utils.CreateUDPAddr(address))
 
 		if address == state.MyName {
@@ -268,9 +269,15 @@ func (state *State) startLeaderElection() {
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
 	// Every time we start a new election we reset the server that have not voted yet
-	state.leftToVote = state.Servers
-	// I have voted for me, so remove me
-	state.leftToVote = Utils.Remove(state.leftToVote, state.MyAddress)
+	state.leftToVote = nil
+	for _, server := range state.Servers {
+		// I have voted for me, so remove me
+		if server.String() == state.MyName {
+			continue
+		}
+
+		state.leftToVote = append(state.leftToVote, server)
+	}
 
 	state.CurrentTerm++
 	state.state = Candidate
