@@ -23,11 +23,11 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	Logger.Log(Logger.INFO, strconv.Itoa(int(state.CurrentTerm)))
 	Logger.Log(Logger.INFO, strconv.Itoa(int(request.Term)))
 
-	if state.CurrentTerm >= request.Term && state.state != Candidate {
+	if state.CurrentTerm > request.Term {
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
-	} else if state.state == Candidate && state.CurrentTerm >= request.Term {
+	} else if state.state == Candidate && state.CurrentTerm == request.Term {
 		// If the request term is equal to the current term, and we are a candidate, then we reject the request
 		// I vote for myself and can only vote for one candidate
 		raftResponse.VoteGranted = false
