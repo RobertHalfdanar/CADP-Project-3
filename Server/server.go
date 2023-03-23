@@ -261,11 +261,16 @@ func (state *State) resendRequestVoteMessage() {
 
 	lastLogIndex := len(state.Log)
 
+	lastLogTerm := uint64(0)
+	if lastLogIndex > 0 {
+		lastLogTerm = state.Log[lastLogIndex-1].Term
+	}
+
 	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
 		Term:          state.CurrentTerm,
 		CandidateName: state.MyName,
 		LastLogIndex:  uint64(lastLogIndex),
-		LastLogTerm:   state.Log[lastLogIndex-1].Term,
+		LastLogTerm:   lastLogTerm,
 	},
 	}}
 
