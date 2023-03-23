@@ -17,7 +17,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	raftResponse := &Raft.RequestVoteResponse{}
 	raftResponse.Term = state.CurrentTerm
 
-	if state.CurrentTerm >= request.Term {
+	if state.CurrentTerm >= request.Term && state.state != Candidate {
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
@@ -72,12 +72,18 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 
 	state.state = Leader
 
-	// Send an message to all other servers
+	// Send a message to all other servers
 	state.Send()
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
-
+	if request.Term != state.CurrentTerm {
+		// TODO Something
+	} else if request.PrevLogIndex < state.CommitIndex {
+		// TODO Stuff
+	} else {
+		// TODO More Stuff
+	}
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {

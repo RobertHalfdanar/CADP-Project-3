@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -50,6 +51,34 @@ type State struct {
 	votes             int                          // Did the server get votes?
 	leftToVote        []*net.UDPAddr               // How has voted
 	lastAppendRequest []*Raft.AppendEntriesRequest // Did we get a response?
+}
+
+type Timer struct {
+	timer time.Duration
+	lock  sync.Mutex
+}
+
+var timer Timer
+
+func (timer *Timer) increaseTimer(amount time.Duration) {
+	timer.lock.Lock()
+	defer timer.lock.Unlock()
+
+	timer.timer += amount
+}
+
+func (timer *Timer) resetTimer() {
+	timer.lock.Lock()
+	defer timer.lock.Unlock()
+
+	timer.timer = 0
+}
+
+func (timer *Timer) getTimer() time.Duration {
+	timer.lock.Lock()
+	defer timer.lock.Unlock()
+
+	return timer.timer
 }
 
 func (state *State) setServers(fileName string) {
@@ -109,7 +138,7 @@ func (state *State) Init() {
 func (state *State) Send() {
 	Logger.Log(Logger.INFO, "Server sending...")
 	for {
-		time.Sleep(5 * time.Second)
+		time.Sleep(BroadcastTime)
 
 		for _, addr := range state.Servers {
 			if addr.String() == state.MyName {
@@ -122,6 +151,33 @@ func (state *State) Send() {
 				Logger.Log(Logger.WARNING, "Failed to send to host")
 			}
 		}
+	}
+}
+
+func (state *State) flush() {
+	start := time.Now()
+	for {
+		elapsed := time.Since(start)
+		timer.increaseTimer(elapsed)
+		if state.state == Follower {
+			if timer.getTimer() >= ElectionTimeout {
+				state.startLeaderElection()
+				timer.resetTimer()
+			}
+		} else if state.state == Leader {
+			if timer.getTimer() >= BroadcastTime {
+				// TODO: Send heartbeat
+			}
+
+		} else if state.state == Candidate {
+			if timer.getTimer() >= BroadcastTime {
+				// TODO: send request election responds to every node that did not respond
+
+				timer.resetTimer()
+			}
+		}
+		start = time.Now()
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
@@ -251,5 +307,6 @@ func Start() {
 
 	state.Init()
 	go state.Server()
+	go state.flush()
 	state.repl()
 }
