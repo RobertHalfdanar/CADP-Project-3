@@ -51,6 +51,15 @@ type State struct {
 	votes             int                          // Did the server get votes?
 	leftToVote        []*net.UDPAddr               // How has voted
 	lastAppendRequest []*Raft.AppendEntriesRequest // Did we get a response?
+
+	lock sync.RWMutex
+}
+
+func (state *State) getState() RaftState {
+	state.lock.RLock()
+	defer state.lock.RUnlock()
+
+	return state.state
 }
 
 type Timer struct {
@@ -159,23 +168,25 @@ func (state *State) flush() {
 	for {
 		elapsed := time.Since(start)
 		timer.increaseTimer(elapsed)
-		if state.state == Follower {
+
+		switch state.getState() {
+		case Follower:
 			if timer.getTimer() >= ElectionTimeout {
 				state.startLeaderElection()
 				timer.resetTimer()
 			}
-		} else if state.state == Leader {
+		case Leader:
 			if timer.getTimer() >= BroadcastTime {
 				// TODO: Send heartbeat
 			}
-
-		} else if state.state == Candidate {
+		case Candidate:
 			if timer.getTimer() >= BroadcastTime {
-				// TODO: send request election responds to every node that did not respond
+				state.resendRequestVoteMessage()
 
 				timer.resetTimer()
 			}
 		}
+
 		start = time.Now()
 		time.Sleep(1 * time.Millisecond)
 	}
@@ -183,6 +194,7 @@ func (state *State) flush() {
 
 // This is the server loop
 func (state *State) Server() {
+
 	// TODO: Configure timeouts, read from the UDP connection, handle incoming messages and update state.
 
 	Logger.Log(Logger.INFO, "Server listening...")
@@ -218,6 +230,7 @@ func (state *State) Server() {
 }
 
 func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
+
 	err := Utils.WriteToUDPConn(state.Listener, addr, message)
 
 	if err != nil {
@@ -226,6 +239,9 @@ func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
 }
 
 func (state *State) sendToAll(message *Raft.Raft) {
+	state.lock.RLock()
+	defer state.lock.RUnlock()
+
 	for _, addr := range state.Servers {
 		if addr.String() == state.MyName {
 			continue
@@ -239,7 +255,29 @@ func (state *State) sendToAll(message *Raft.Raft) {
 	}
 }
 
+func (state *State) resendRequestVoteMessage() {
+	state.lock.RLock()
+	defer state.lock.RUnlock()
+
+	lastLogIndex := len(state.Log)
+
+	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
+		Term:          state.CurrentTerm,
+		CandidateName: state.MyName,
+		LastLogIndex:  uint64(lastLogIndex),
+		LastLogTerm:   state.Log[lastLogIndex-1].Term,
+	},
+	}}
+
+	for _, addr := range state.leftToVote {
+		state.sendTo(addr, message)
+	}
+}
+
 func (state *State) startLeaderElection() {
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
 	// Every time we start a new election we reset the server that have not voted yet
@@ -252,23 +290,19 @@ func (state *State) startLeaderElection() {
 	state.VotedFor = state.MyAddress
 	state.votes = 1
 
+	lastLogIndex := len(state.Log)
+
 	// Issue a request vote to all other servers
 	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
 		Term:          state.CurrentTerm,
 		CandidateName: state.MyName,
-		LastLogIndex:  0, // TODO: This should not be zero
-		LastLogTerm:   0, // TODO: This should not be zero
+		LastLogIndex:  uint64(lastLogIndex),
+		LastLogTerm:   state.Log[lastLogIndex-1].Term,
 	},
 	}}
 
 	Logger.Log(Logger.INFO, "Sending request vote to all other servers")
 	state.sendToAll(message)
-
-	// TODO: I win the election
-
-	// TODO: Another server establishes itself as leader
-
-	// TODO: a period of time goes by with no winner
 }
 
 func (state *State) repl() {

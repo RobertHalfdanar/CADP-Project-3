@@ -12,6 +12,9 @@ func (state *State) commandMessageHandler(command string) {
 }
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
 	Logger.Log(Logger.INFO, "Handling request vote message...")
 
 	raftResponse := &Raft.RequestVoteResponse{}
@@ -54,6 +57,9 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 }
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
 	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
 
 	// Remove the server that has voted
