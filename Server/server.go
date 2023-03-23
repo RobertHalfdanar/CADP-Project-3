@@ -168,7 +168,7 @@ func (state *State) flush() {
 	for {
 		elapsed := time.Since(start)
 		timer.increaseTimer(elapsed)
-
+		fmt.Println("stuff")
 		switch state.getState() {
 		case Follower:
 			if timer.getTimer() >= ElectionTimeout {
@@ -284,7 +284,6 @@ func (state *State) resendRequestVoteMessage() {
 
 func (state *State) startLeaderElection() {
 	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
@@ -313,8 +312,10 @@ func (state *State) startLeaderElection() {
 		LastLogTerm:   lastLogTerm,
 	},
 	}}
+	state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Sending request vote to all other servers")
+
 	state.sendToAll(message)
 }
 

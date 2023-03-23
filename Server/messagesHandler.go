@@ -13,7 +13,6 @@ func (state *State) commandMessageHandler(command string) {
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
 	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Handling request vote message...")
 
@@ -47,6 +46,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	envelope := &Raft.Raft{}
 	envelope.Message = &Raft.Raft_RequestVoteResponse{RequestVoteResponse: raftResponse}
 
+	state.lock.Unlock()
 	state.sendTo(address, envelope)
 
 	if raftResponse.VoteGranted {
@@ -58,7 +58,6 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
 	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
 
@@ -79,6 +78,8 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	state.state = Leader
 
 	// Send a message to all other servers
+	state.lock.Unlock()
+
 	state.Send()
 }
 
