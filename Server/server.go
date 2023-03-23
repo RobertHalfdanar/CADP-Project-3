@@ -148,7 +148,7 @@ func (state *State) Init() {
 func (state *State) sendHeartbeat() {
 	Logger.Log(Logger.INFO, "Sending Heartbeat...")
 	message := &Raft.Raft{Message: &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: &Raft.AppendEntriesRequest{
-		Term:         -1,
+		Term:         0,
 		PrevLogIndex: 0,
 		PrevLogTerm:  0,
 		LeaderCommit: 0,
