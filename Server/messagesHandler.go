@@ -39,6 +39,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		state.CurrentTerm = request.Term
 		state.state = Follower
 		state.VotedFor = address
+		timer.resetTimer()
 
 		raftResponse.VoteGranted = true
 	}
@@ -79,8 +80,6 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 
 	// Send a message to all other servers
 	state.lock.Unlock()
-
-	state.Send()
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {

@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	BroadcastTime   = 20 * time.Millisecond
+	BroadcastTime   = 500 * time.Millisecond
 	ElectionTimeout = 20 * BroadcastTime
 )
 
@@ -144,31 +144,11 @@ func (state *State) Init() {
 	}
 }
 
-func (state *State) Send() {
-	Logger.Log(Logger.INFO, "Server sending...")
-	for {
-		time.Sleep(BroadcastTime)
-
-		for _, addr := range state.Servers {
-			if addr.String() == state.MyName {
-				continue
-			} // Don't send to self
-			msg := &Raft.Raft{Message: nil}
-			err := Utils.WriteToUDPConn(state.Listener, addr, msg)
-
-			if err != nil {
-				Logger.Log(Logger.WARNING, "Failed to send to host")
-			}
-		}
-	}
-}
-
 func (state *State) flush() {
 	start := time.Now()
 	for {
 		elapsed := time.Since(start)
 		timer.increaseTimer(elapsed)
-		fmt.Println("stuff")
 		switch state.getState() {
 		case Follower:
 			if timer.getTimer() >= ElectionTimeout {
