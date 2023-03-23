@@ -145,6 +145,21 @@ func (state *State) Init() {
 	}
 }
 
+func (state *State) sendHeartbeat() {
+	Logger.Log(Logger.INFO, "Sending Heartbeat...")
+	message := &Raft.Raft{Message: &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: &Raft.AppendEntriesRequest{
+		Term:         -1,
+		PrevLogIndex: 0,
+		PrevLogTerm:  0,
+		LeaderCommit: 0,
+		LeaderId:     "",
+		Entries:      nil,
+	},
+	}}
+
+	state.sendToAll(message)
+}
+
 func (state *State) flush() {
 	start := time.Now()
 	for {
@@ -158,7 +173,8 @@ func (state *State) flush() {
 			}
 		case Leader:
 			if timer.getTimer() >= BroadcastTime {
-				// TODO: Send heartbeat
+				state.sendHeartbeat()
+				timer.resetTimer()
 			}
 		case Candidate:
 			if timer.getTimer() >= BroadcastTime {

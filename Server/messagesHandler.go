@@ -83,7 +83,10 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
-	if request.Term != state.CurrentTerm {
+	if request.Term <= -1 {
+		Logger.Log(Logger.INFO, "Received Heartbeat")
+		timer.resetTimer()
+	} else if request.Term != state.CurrentTerm {
 		// TODO Something
 	} else if request.PrevLogIndex < state.CommitIndex {
 		// TODO Stuff
