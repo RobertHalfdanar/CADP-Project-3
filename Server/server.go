@@ -256,6 +256,9 @@ func (state *State) sendToAll(message *Raft.Raft) {
 }
 
 func (state *State) resendRequestVoteMessage() {
+
+	Logger.Log(Logger.INFO, "Resending request vote message...")
+
 	state.lock.RLock()
 	defer state.lock.RUnlock()
 
