@@ -200,7 +200,6 @@ func (state *State) Server() {
 	for {
 		msg := &Raft.Raft{}
 		address, err := Utils.ReadFromUDPConn(state.Listener, msg)
-		Logger.Log(Logger.INFO, "Message received: "+msg.String())
 
 		if err != nil {
 			Logger.Log(Logger.WARNING, "Failed to read from UDP listener")
