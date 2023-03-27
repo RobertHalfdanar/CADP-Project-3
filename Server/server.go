@@ -6,6 +6,7 @@ import (
 	"CADP-Project-3/Utils"
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -14,8 +15,8 @@ import (
 )
 
 const (
-	BroadcastTime   = 1000 * time.Millisecond
-	ElectionTimeout = 5 * BroadcastTime // 20 * BroadcastTime
+	BroadcastTime   = 5000 * time.Millisecond
+	ElectionTimeout = 2 * BroadcastTime // 20 * BroadcastTime
 )
 
 // States of the Server, cf figure 4
@@ -145,11 +146,23 @@ func (state *State) Init() {
 	}
 }
 
+func (state *State) commitEntry() {
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
+	Logger.Log(Logger.INFO, "Committing entry...")
+
+	state.CommitIndex++
+
+	// log commit index entry
+	log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.CommitIndex-1].Term, state.Log[state.CommitIndex-1].Index, state.Log[state.CommitIndex-1].CommandName))
+}
+
 func (state *State) sendHeartbeat() {
 	Logger.Log(Logger.INFO, "Sending Heartbeat...")
-	envalope := &Raft.Raft{}
-	innerEnvalope := &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: nil}
-	envalope.Message = innerEnvalope
+	envelope := &Raft.Raft{}
+	innerEnvelope := &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: nil}
+	envelope.Message = innerEnvelope
 
 	message := &Raft.AppendEntriesRequest{
 		Term:         state.CurrentTerm,
@@ -161,6 +174,15 @@ func (state *State) sendHeartbeat() {
 	}
 
 	for i, server := range state.Servers {
+		message := &Raft.AppendEntriesRequest{
+			Term:         state.CurrentTerm,
+			LeaderCommit: state.CommitIndex,
+			LeaderId:     state.MyName,
+			PrevLogIndex: 0,
+			PrevLogTerm:  0,
+			Entries:      []*Raft.LogEntry{},
+		}
+
 		if state.MyName == server.String() {
 			continue
 		}
@@ -171,14 +193,17 @@ func (state *State) sendHeartbeat() {
 			message.PrevLogTerm = state.Log[message.PrevLogIndex].Term
 		}
 
-		if state.NextIndex[i]-1 < uint64(len(state.Log)) {
+		//  2 - 1 = 1
+		fmt.Println("NextIndex: ", state.NextIndex[i])
+
+		if uint64(len(state.Log)) > state.NextIndex[i]-1 {
 
 			message.Entries = append(message.Entries, state.Log[state.NextIndex[i]-1])
 		}
 
-		innerEnvalope.AppendEntriesRequest = message
+		innerEnvelope.AppendEntriesRequest = message
 
-		state.sendTo(server, envalope)
+		state.sendTo(server, envelope)
 	}
 }
 
@@ -242,6 +267,7 @@ func (state *State) Server() {
 				continue
 			}
 		*/
+
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		state.messagesHandler(msg, address)
 

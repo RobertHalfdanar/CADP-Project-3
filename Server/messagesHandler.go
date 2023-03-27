@@ -4,6 +4,8 @@ import (
 	"CADP-Project-3/Logger"
 	"CADP-Project-3/Raft"
 	"CADP-Project-3/Utils"
+	"fmt"
+	"math"
 	"net"
 	"strconv"
 )
@@ -15,7 +17,7 @@ func (state *State) commandMessageHandler(command string) {
 
 	Logger.Log(Logger.INFO, "Handling command message...")
 
-	newEntry := &Raft.LogEntry{CommandName: command, Term: state.CurrentTerm, Index: uint64(len(state.Log) - 1)}
+	newEntry := &Raft.LogEntry{CommandName: command, Term: state.CurrentTerm, Index: uint64(len(state.Log) + 1)}
 	state.Log = append(state.Log, newEntry)
 }
 
@@ -102,66 +104,50 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
-
-	appendEntriesResponse := &Raft.AppendEntriesResponse{}
-	appendEntriesResponse.Term = state.CurrentTerm
-	appendEntriesResponse.Success = true
+	state.lock.Lock()
 
 	timer.resetTimer()
 
-	if len(request.Entries) == 0 {
-		Logger.Log(Logger.INFO, "Received Heartbeat")
-		return
+	// if and return -> AppendEntriesFails
+	// if There is an entry in the message
+	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 
-	} else if request.Term < state.CurrentTerm {
-		// TODO 1. Reply false if term < currentTerm (§5.1)
+	if request.Term < state.CurrentTerm {
 		Logger.Log(Logger.INFO, "Append entries not successful, mismatching term")
-		appendEntriesResponse.Success = false
-	}
-
-	if request.PrevLogIndex != 0 {
-		term := state.Log[request.PrevLogIndex-1].Term
-
-		if term != request.PrevLogTerm {
-			// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-			Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
-			appendEntriesResponse.Success = false
-		}
-	}
-
-	if appendEntriesResponse.Success == false {
-		Logger.Log(Logger.INFO, "Append entries not successful, send response to leader")
-
-		state.sendTo(
-			address,
-			&Raft.Raft{Message: &Raft.Raft_AppendEntriesResponse{AppendEntriesResponse: appendEntriesResponse}})
-
+		state.AppendEntriesFails(address)
+		state.lock.Unlock()
 		return
+
+	} else if uint64(len(state.Log)) > request.PrevLogIndex-1 && state.Log[request.PrevLogIndex-1].Term != request.PrevLogTerm {
+		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
+		state.AppendEntriesFails(address)
+		state.lock.Unlock()
+		return
+
+	} else if len(request.Entries) > 0 {
+		state.newEntry(request)
 	}
 
-	newEntry := request.Entries[0]
-	newAllocatedEntry := new(Entry)
-	*newAllocatedEntry = *newEntry
-
-	// TODO If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-	if newEntry.Index <= uint64(len(state.Log)) && state.Log[newEntry.Index].Term != newEntry.Term {
-		state.Log[newEntry.Index] = newAllocatedEntry
-	} else { // TODO Append any new entries not already in the log
-		state.Log = append(state.Log, newEntry)
-	}
-
-	// TODO If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
 	if request.LeaderCommit > state.CommitIndex {
-		if request.LeaderCommit < newEntry.Index {
-			state.CommitIndex = request.LeaderCommit
-		} else {
-			state.CommitIndex = newEntry.Index
-		}
-
+		fmt.Println("This should happen")
+		state.lock.Unlock()
+		state.commitEntries(request)
+		state.lock.Lock()
 	}
 
-	Logger.Log(Logger.INFO, "Append entries successful, send response to leader")
-	state.sendTo(address, &Raft.Raft{Message: &Raft.Raft_AppendEntriesResponse{AppendEntriesResponse: appendEntriesResponse}})
+	if len(request.Entries) > 0 {
+		appendEntriesResponse := &Raft.AppendEntriesResponse{}
+		appendEntriesResponse.Term = state.CurrentTerm
+		appendEntriesResponse.Success = true
+		state.sendTo(address, &Raft.Raft{Message: &Raft.Raft_AppendEntriesResponse{AppendEntriesResponse: appendEntriesResponse}})
+
+		Logger.Log(Logger.INFO, "Append entries successful, send response to leader")
+	} else {
+		Logger.Log(Logger.INFO, "Received heartbeat")
+	}
+
+	state.lock.Unlock()
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
@@ -175,9 +161,30 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	if response.Success == false {
 		state.NextIndex[addressIndex]--
-	} else {
-		state.NextIndex[addressIndex]++
-		state.MatchIndex[addressIndex]++
+		state.lock.Unlock()
+		return
+	}
+
+	state.NextIndex[addressIndex]++
+	state.MatchIndex[addressIndex]++
+
+	// TODO: If there exists an N such that N > commitIndex, a majority
+	//		 of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+	//       set commitIndex = N (§5.3, §5.4)
+
+	countIndex := map[uint64]int{}
+
+	for _, matchIndex := range state.MatchIndex {
+
+		fmt.Println("Index: ", matchIndex)
+
+		count, ok := countIndex[matchIndex]
+
+		if !ok {
+			countIndex[matchIndex] = 1
+		} else {
+			countIndex[matchIndex] = count + 1
+		}
 	}
 }
 
