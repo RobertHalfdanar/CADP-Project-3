@@ -119,12 +119,14 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		appendEntriesResponse.Success = false
 	}
 
-	term := state.Log[request.PrevLogIndex].Term
+	if request.PrevLogIndex != 0 {
+		term := state.Log[request.PrevLogIndex-1].Term
 
-	if term != request.PrevLogTerm {
-		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
-		appendEntriesResponse.Success = false
+		if term != request.PrevLogTerm {
+			// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+			Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
+			appendEntriesResponse.Success = false
+		}
 	}
 
 	if appendEntriesResponse.Success == false {
