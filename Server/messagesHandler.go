@@ -98,22 +98,32 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		return
 	}
 
-	// minus 1 at PrevLogIndex because log indices start at 1 (WHY!?!)
-	if uint64(len(state.Log)) <= request.PrevLogIndex-1 {
-		// TODO Reply False
-		return
-	}
-
 	term := state.Log[request.PrevLogIndex].Term
 	if term != request.PrevLogTerm {
 		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 		return
 	}
 
-	// TODO If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-	// TODO Append any new entries not already in the log
-	// TODO If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+	newEntry := request.Entries[0]
+	newAllocatedEntry := new(Entry)
+	*newAllocatedEntry = *newEntry
 
+	// TODO If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
+	if newEntry.Index <= uint64(len(state.Log)) && state.Log[newEntry.Index].Term != newEntry.Term {
+		state.Log[newEntry.Index] = newAllocatedEntry
+	} else { // TODO Append any new entries not already in the log
+		state.Log = append(state.Log, newEntry)
+	}
+
+	// TODO If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+	if request.LeaderCommit > state.CommitIndex {
+		if request.LeaderCommit < newEntry.Index {
+			state.CommitIndex = request.LeaderCommit
+		} else {
+			state.CommitIndex = newEntry.Index
+		}
+
+	}
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {
