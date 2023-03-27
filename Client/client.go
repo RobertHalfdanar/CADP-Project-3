@@ -17,19 +17,14 @@ type Server struct {
 	Port int32
 }
 
+var listener *net.UDPConn
+
 // Send sends a message to the server, the server is specified in the Server struct
 // if the server is not available, it will print an error message.
 func (node *Server) Send(msg *Raft.Raft) {
-	conn, err := net.DialUDP("udp", nil, node.Addr)
-	defer conn.Close()
-
-	if err != nil {
-		fmt.Println("\u001B[31mFailed to connect to host\u001B[0m")
-		return
-	}
 
 	// Send the message to the server
-	err = Utils.WriteToUDPConn(conn, node.Addr, msg)
+	err := Utils.WriteToUDPConn(listener, node.Addr, msg)
 
 	if err != nil {
 		fmt.Println("\u001B[31mFailed to send to host\u001B[0m")
@@ -95,6 +90,14 @@ func Start(serverAddress string) {
 
 	server.IP, server.Port = Utils.ToIPAndPort(serverAddress)
 	server.Addr = Utils.CreateUDPAddr(serverAddress)
+
+	var err error
+	listener, err = Utils.CreateUDPListener(":0")
+
+	if err != nil {
+		fmt.Println("\u001B[31mFailed to create listener\u001B[0m")
+		panic("Failed to create listener")
+	}
 
 	commandsListener()
 }

@@ -236,11 +236,12 @@ func (state *State) Server() {
 		}
 		failures = 0
 
-		if !Utils.Contains(state.Servers, address) {
-			Logger.Log(Logger.WARNING, "Unknown address received!")
-			continue
-		}
-
+		/*
+			if !Utils.Contains(state.Servers, address) {
+				Logger.Log(Logger.WARNING, "Unknown address received!")
+				continue
+			}
+		*/
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		state.messagesHandler(msg, address)
 
