@@ -147,17 +147,34 @@ func (state *State) Init() {
 
 func (state *State) sendHeartbeat() {
 	Logger.Log(Logger.INFO, "Sending Heartbeat...")
-	message := &Raft.Raft{Message: &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: &Raft.AppendEntriesRequest{
-		Term:         0,
+	envalope := &Raft.Raft{}
+	innerEnvalope := &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: nil}
+	envalope.Message = innerEnvalope
+
+	message := &Raft.AppendEntriesRequest{
+		Term:         state.CurrentTerm,
+		LeaderCommit: state.CommitIndex,
+		LeaderId:     state.MyName,
 		PrevLogIndex: 0,
 		PrevLogTerm:  0,
-		LeaderCommit: 0,
-		LeaderId:     "",
-		Entries:      nil,
-	},
-	}}
+		Entries:      []*Raft.LogEntry{},
+	}
 
-	state.sendToAll(message)
+	for i, server := range state.Servers {
+		if state.MyName == server.String() {
+			continue
+		}
+
+		message.PrevLogIndex = state.NextIndex[i] - 1
+		message.PrevLogTerm = state.Log[message.PrevLogIndex].Term
+
+		if state.NextIndex[i]-1 < uint64(len(state.Log)) {
+
+			message.Entries = append(message.Entries, state.Log[state.NextIndex[i]-1])
+		}
+
+		innerEnvalope.AppendEntriesRequest = message
+	}
 }
 
 func (state *State) flush() {
