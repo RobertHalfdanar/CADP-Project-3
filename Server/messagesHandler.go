@@ -10,6 +10,13 @@ import (
 
 func (state *State) commandMessageHandler(command string) {
 
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
+	Logger.Log(Logger.INFO, "Handling command message...")
+
+	newEntry := &Raft.LogEntry{CommandName: command, Term: state.CurrentTerm, Index: uint64(len(state.Log) - 1)}
+	state.Log = append(state.Log, newEntry)
 }
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
@@ -86,21 +93,39 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	state.lock.Unlock()
 }
 
-func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
+func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
+
+	appendEntriesResponse := &Raft.AppendEntriesResponse{}
+	appendEntriesResponse.Term = state.CurrentTerm
+	appendEntriesResponse.Success = true
+
 	timer.resetTimer()
 
 	if len(request.Entries) == 0 {
 		Logger.Log(Logger.INFO, "Received Heartbeat")
-
 		return
+
 	} else if request.Term < state.CurrentTerm {
 		// TODO 1. Reply false if term < currentTerm (§5.1)
-		return
+		Logger.Log(Logger.INFO, "Append entries not successful, mismatching term")
+		appendEntriesResponse.Success = false
 	}
 
 	term := state.Log[request.PrevLogIndex].Term
+
 	if term != request.PrevLogTerm {
 		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
+		appendEntriesResponse.Success = false
+	}
+
+	if appendEntriesResponse.Success == false {
+		Logger.Log(Logger.INFO, "Append entries not successful, send response to leader")
+
+		state.sendTo(
+			address,
+			&Raft.Raft{Message: &Raft.Raft_AppendEntriesResponse{AppendEntriesResponse: appendEntriesResponse}})
+
 		return
 	}
 
@@ -124,10 +149,26 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		}
 
 	}
+
+	Logger.Log(Logger.INFO, "Append entries successful, send response to leader")
+	state.sendTo(address, &Raft.Raft{Message: &Raft.Raft_AppendEntriesResponse{AppendEntriesResponse: appendEntriesResponse}})
 }
 
-func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {
+func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
+	state.lock.Lock()
+	defer state.lock.Unlock()
 
+	addressIndex := Utils.IndexOf(state.Servers, address)
+	if addressIndex == -1 {
+		panic("Should not happen")
+	}
+
+	if response.Success == false {
+		state.NextIndex[addressIndex]--
+	} else {
+		state.NextIndex[addressIndex]++
+		state.MatchIndex[addressIndex]++
+	}
 }
 
 func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
@@ -139,8 +180,8 @@ func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
 	case *Raft.Raft_RequestVoteResponse:
 		state.requestVoteResponseMessageHandler(v.RequestVoteResponse, address)
 	case *Raft.Raft_AppendEntriesRequest:
-		state.appendEntriesRequestMessageHandler(v.AppendEntriesRequest)
+		state.appendEntriesRequestMessageHandler(v.AppendEntriesRequest, address)
 	case *Raft.Raft_AppendEntriesResponse:
-		state.appendEntriesResponseMessageHandler(v.AppendEntriesResponse)
+		state.appendEntriesResponseMessageHandler(v.AppendEntriesResponse, address)
 	}
 }

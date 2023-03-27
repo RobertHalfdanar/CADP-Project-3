@@ -43,3 +43,12 @@ func Remove(s []*net.UDPAddr, e *net.UDPAddr) []*net.UDPAddr {
 	s[index] = s[len(s)-1]
 	return s[:len(s)-1]
 }
+
+func IndexOf(s []*net.UDPAddr, e *net.UDPAddr) int {
+	for i, a := range s {
+		if a.String() == e.String() {
+			return i
+		}
+	}
+	return -1
+}
