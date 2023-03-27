@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	BroadcastTime   = 500 * time.Millisecond
-	ElectionTimeout = 20 * BroadcastTime
+	BroadcastTime   = 1000 * time.Millisecond
+	ElectionTimeout = 5 * BroadcastTime // 20 * BroadcastTime
 )
 
 // States of the Server, cf figure 4
@@ -177,6 +177,8 @@ func (state *State) sendHeartbeat() {
 		}
 
 		innerEnvalope.AppendEntriesRequest = message
+
+		state.sendTo(server, envalope)
 	}
 }
 
