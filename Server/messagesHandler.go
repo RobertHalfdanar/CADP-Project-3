@@ -87,16 +87,33 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest) {
-	if request.LeaderId == "" {
+	timer.resetTimer()
+
+	if len(request.Entries) == 0 {
 		Logger.Log(Logger.INFO, "Received Heartbeat")
-		timer.resetTimer()
-	} else if request.Term != state.CurrentTerm {
-		// TODO Something
-	} else if request.PrevLogIndex < state.CommitIndex {
-		// TODO Stuff
-	} else {
-		// TODO More Stuff
+
+		return
+	} else if request.Term < state.CurrentTerm {
+		// TODO 1. Reply false if term < currentTerm (§5.1)
+		return
 	}
+
+	// minus 1 at PrevLogIndex because log indices start at 1 (WHY!?!)
+	if uint64(len(state.Log)) <= request.PrevLogIndex-1 {
+		// TODO Reply False
+		return
+	}
+
+	term := state.Log[request.PrevLogIndex].Term
+	if term != request.PrevLogTerm {
+		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+		return
+	}
+
+	// TODO If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
+	// TODO Append any new entries not already in the log
+	// TODO If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse) {
