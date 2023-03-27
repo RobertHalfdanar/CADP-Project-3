@@ -166,7 +166,10 @@ func (state *State) sendHeartbeat() {
 		}
 
 		message.PrevLogIndex = state.NextIndex[i] - 1
-		message.PrevLogTerm = state.Log[message.PrevLogIndex].Term
+
+		if uint64(len(state.Log)) > message.PrevLogIndex {
+			message.PrevLogTerm = state.Log[message.PrevLogIndex].Term
+		}
 
 		if state.NextIndex[i]-1 < uint64(len(state.Log)) {
 
