@@ -164,15 +164,6 @@ func (state *State) sendHeartbeat() {
 	innerEnvelope := &Raft.Raft_AppendEntriesRequest{AppendEntriesRequest: nil}
 	envelope.Message = innerEnvelope
 
-	message := &Raft.AppendEntriesRequest{
-		Term:         state.CurrentTerm,
-		LeaderCommit: state.CommitIndex,
-		LeaderId:     state.MyName,
-		PrevLogIndex: 0,
-		PrevLogTerm:  0,
-		Entries:      []*Raft.LogEntry{},
-	}
-
 	for i, server := range state.Servers {
 		message := &Raft.AppendEntriesRequest{
 			Term:         state.CurrentTerm,
@@ -189,8 +180,8 @@ func (state *State) sendHeartbeat() {
 
 		message.PrevLogIndex = state.NextIndex[i] - 1
 
-		if uint64(len(state.Log)) > message.PrevLogIndex {
-			message.PrevLogTerm = state.Log[message.PrevLogIndex].Term
+		if uint64(len(state.Log)) > message.PrevLogIndex-1 {
+			message.PrevLogTerm = state.Log[message.PrevLogIndex-1].Term
 		}
 
 		//  2 - 1 = 1
@@ -391,6 +382,18 @@ func (state *State) repl() {
 	}
 }
 
+func (state *State) loggerInit() {
+	filename := "./" + "server-" + strings.Replace(state.MyName, ":", "-", 1) + ".log"
+
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+		Logger.Log(Logger.ERROR, "Failed to open log file!")
+	}
+
+	log.SetOutput(file)
+}
+
 func Start() {
 	state := &State{
 		CurrentTerm: 0,
@@ -406,6 +409,7 @@ func Start() {
 	}
 
 	state.Init()
+	state.loggerInit()
 	go state.Server()
 	go state.flush()
 	state.repl()

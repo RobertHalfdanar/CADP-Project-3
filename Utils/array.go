@@ -52,3 +52,7 @@ func IndexOf(s []*net.UDPAddr, e *net.UDPAddr) int {
 	}
 	return -1
 }
+
+func Count() {
+
+}
