@@ -139,19 +139,23 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		newEntry = request.Entries[0]
 	}
 
+	prevCommitted := state.CommitIndex
+
 	if request.LeaderCommit < newEntry.Index {
-
-		numberOfCommits := request.LeaderCommit - state.CommitIndex
-
-		for ; numberOfCommits > 0; numberOfCommits-- {
-			state.commitEntry()
-		}
-
+		// The new entry has not been committed
 		state.CommitIndex = request.LeaderCommit
 	} else {
 		state.CommitIndex = newEntry.Index
+	}
+
+	// The leader has committed more entries than we have
+	numberOfCommits := state.CommitIndex - prevCommitted
+
+	for ; numberOfCommits > 0; numberOfCommits-- {
+		// Commit entries until we reach the leader commit index
 		state.commitEntry()
 	}
+
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
