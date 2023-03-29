@@ -167,14 +167,12 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 	if request.Term < state.CurrentTerm {
 		Logger.Log(Logger.INFO, "Append entries not successful, mismatching term")
 		state.AppendEntriesFails(address)
-		state.lock.Unlock()
 		return
 
 	} else if uint64(len(state.Log)) > request.PrevLogIndex-1 && state.Log[request.PrevLogIndex-1].Term != request.PrevLogTerm {
 		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
 		state.AppendEntriesFails(address)
-		state.lock.Unlock()
 		return
 
 	} else if len(request.Entries) > 0 {
