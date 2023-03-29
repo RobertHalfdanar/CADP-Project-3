@@ -271,7 +271,7 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	majority := int(math.Ceil(float64(len(state.Servers)) / 2.0))
 
 	for k, v := range countIndex {
-		if v > majority && k > leaderCommitIndex {
+		if v >= majority && k > leaderCommitIndex {
 			state.CommitIndex = k
 			state.commitEntry()
 			break

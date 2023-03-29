@@ -3,6 +3,7 @@ package main
 import (
 	"CADP-Project-3/Logger"
 	"bufio"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -128,6 +129,15 @@ func initCommands() {
 	}
 }
 
+func sendToServer(client *Node) {
+	for _, client := range clients {
+		for _, command := range commands {
+			client.sendCommand(command)
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+}
+
 func simulation() {
 	for _, server := range servers {
 		server.Start()
@@ -139,29 +149,15 @@ func simulation() {
 
 	time.Sleep(10 * time.Second)
 
+	go sendToServer(clients[0])
+
 	for {
-		for _, client := range clients {
-			for _, command := range commands {
-				client.sendCommand(command)
-				time.Sleep(500 * time.Millisecond)
-			}
+		time.Sleep(20 * time.Second)
+		for _, server := range servers {
+			server.sendCommand("print")
 		}
+
+		fmt.Println("Printed")
 	}
-
-	/*
-
-		timeStart := time.Now()
-			for true {
-				for _, server := range servers {
-					currentTime := time.Now()
-
-					/*if err := server.cmd.Wait(); err != nil {
-						fmt.Printf("Error waiting for command: %s\n", err)
-						break
-					}*/
-	/*
-		if currentTime.Sub(timeStart) > 10*time.Second {
-			server.pipeWriter.Write([]byte("print\n"))
-		}*/
 
 }

@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	BroadcastTime   = 5000 * time.Millisecond
-	ElectionTimeout = 2 * BroadcastTime // 20 * BroadcastTime
+	BroadcastTime   = 20 * time.Millisecond
+	ElectionTimeout = 20 * BroadcastTime
 )
 
 // States of the Server, cf figure 4
