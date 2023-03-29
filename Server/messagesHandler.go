@@ -142,8 +142,8 @@ func (state *State) newEntry(request *Raft.AppendEntriesRequest) {
 	*newAllocatedEntry = *newEntry
 
 	// TODO If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-	if newEntry.Index < uint64(len(state.Log)) && state.Log[newEntry.Index].Term != newEntry.Term {
-		state.Log[newEntry.Index] = newAllocatedEntry
+	if newEntry.Index <= uint64(len(state.Log)) && state.Log[newEntry.Index-1].Term != newEntry.Term {
+		state.Log[newEntry.Index-1] = newAllocatedEntry
 	} else { // TODO Append any new entries not already in the log
 		state.Log = append(state.Log, newEntry)
 	}
