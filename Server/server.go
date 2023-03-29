@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -93,11 +94,16 @@ func (timer *Timer) increaseTimer(amount time.Duration) {
 	timer.timer += amount
 }
 
-func (timer *Timer) resetTimer() {
+func (timer *Timer) resetTimer(random bool) {
 	timer.lock.Lock()
 	defer timer.lock.Unlock()
 
-	timer.timer = 0
+	if random {
+		stuff := rand.Int31n(300-150) + 150
+		timer.timer = ElectionTimeout - time.Duration(stuff)*time.Millisecond
+	} else {
+		timer.timer = 0
+	}
 }
 
 func (timer *Timer) getTimer() time.Duration {
@@ -217,18 +223,18 @@ func (state *State) flush() {
 		case Follower:
 			if timer.getTimer() >= ElectionTimeout {
 				state.startLeaderElection()
-				timer.resetTimer()
+				timer.resetTimer(false)
 			}
 		case Leader:
 			if timer.getTimer() >= BroadcastTime {
 				state.sendHeartbeat()
-				timer.resetTimer()
+				timer.resetTimer(false)
 			}
 		case Candidate:
 			if timer.getTimer() >= BroadcastTime {
 				state.resendRequestVoteMessage()
 
-				timer.resetTimer()
+				timer.resetTimer(false)
 			}
 		}
 

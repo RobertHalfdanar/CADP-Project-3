@@ -74,7 +74,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		state.CurrentTerm = request.Term
 		state.state = Follower
 		state.VotedFor = address
-		timer.resetTimer()
+		timer.resetTimer(true)
 
 		raftResponse.VoteGranted = true
 	}
@@ -193,7 +193,7 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 
 	state.leader = address
 
-	timer.resetTimer()
+	timer.resetTimer(true)
 
 	// if and return -> AppendEntriesFails
 	// if There is an entry in the message

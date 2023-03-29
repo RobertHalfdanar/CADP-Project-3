@@ -68,7 +68,7 @@ func (state *State) resumeCommandHandler() {
 	defer state.lock.Unlock()
 
 	state.state = Follower
-	timer.resetTimer()
+	timer.resetTimer(true)
 
 	fmt.Println("\033[32mThis server is resumed\033[0m")
 }
