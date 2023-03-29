@@ -156,6 +156,7 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
 	state.lock.Lock()
+	defer state.lock.Unlock()
 
 	timer.resetTimer()
 
@@ -197,8 +198,6 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 	} else {
 		Logger.Log(Logger.INFO, "Received heartbeat")
 	}
-
-	state.lock.Unlock()
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
