@@ -37,6 +37,9 @@ func (node *Node) sendCommand(command string) {
 var servers []*Node
 var clients []*Node
 
+var suspendedServers []*Node
+var maxSus = 1
+
 func createNode(fileToExec string, address string, processFilepath string, args ...string) *Node {
 	r, w := io.Pipe()
 
@@ -105,7 +108,7 @@ func main() {
 
 	initCommands()
 
-	simulation()
+	simulateSuspend()
 
 }
 
@@ -133,7 +136,7 @@ func sendToServer(client *Node) {
 	for _, client := range clients {
 		for _, command := range commands {
 			client.sendCommand(command)
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(2 * time.Second)
 		}
 	}
 }
@@ -147,18 +150,64 @@ func simulation() {
 		client.Start()
 	}
 
+	// Give time for a leader to emerge
 	time.Sleep(10 * time.Second)
 
+	// Client in its own thread
 	go sendToServer(clients[0])
 
+	// Sending commands to servers
 	for {
-		time.Sleep(20 * time.Second)
+		time.Sleep(5 * time.Second)
 		for _, server := range servers {
 			server.sendCommand("print")
-			fmt.Println("Printed")
-
 		}
-
 	}
 
+	/*
+
+		if len(suspendedServers) < maxSus && rand.Int31n(100) < 50 {
+			server.sendCommand("suspend")
+		} else if len(suspendedServers) >= maxSus && rand.Int31n(100) < 50 {
+			server.sendCommand("resume")
+		}
+	*/
+
+}
+
+func simulateSuspend() {
+	for _, server := range servers {
+		server.Start()
+	}
+
+	for _, client := range clients {
+		client.Start()
+	}
+
+	// Give time for a leader to emerge
+	time.Sleep(10 * time.Second)
+
+	timeStart := time.Now()
+	resumed := false
+
+	servers[1].sendCommand("suspend")
+
+	// Client in its own thread
+	go sendToServer(clients[0])
+
+	// Sending commands to servers
+	for {
+		time.Sleep(5 * time.Second)
+
+		currentTime := time.Now()
+		for _, server := range servers {
+			server.sendCommand("print")
+		}
+
+		if currentTime.Sub(timeStart).Seconds() >= 20 && !resumed {
+			servers[1].sendCommand("resume")
+			resumed = true
+			fmt.Println("Server resumed!")
+		}
+	}
 }
