@@ -151,6 +151,8 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 	// The leader has committed more entries than we have
 	numberOfCommits := state.CommitIndex - prevCommitted
 
+	fmt.Println("Committing entries: ", numberOfCommits)
+
 	for ; numberOfCommits > 0; numberOfCommits-- {
 		// Commit entries until we reach the leader commit index
 		state.commitEntry()
@@ -244,6 +246,7 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	for k, v := range countIndex {
 		if v > majority && k > leaderCommitIndex {
+			state.CommitIndex = k
 			state.commitEntry()
 			break
 		}
