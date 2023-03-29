@@ -15,46 +15,37 @@ suspend
 */
 
 func (state *State) printCommandHandler() {
-	fmt.Println("print command")
-
 	state.lock.RLock()
 	defer state.lock.RUnlock()
 
-	println()
+	dataColumnLength := 16
 
-	/*
-		func printNodeRegistry(node *RegisteredNode) {
-			if node.registry == nil {
-				return
-			}
+	if len(state.Servers)*3 > 16 {
+		dataColumnLength = len(state.Servers)*3 + 4
+	}
 
-			fmt.Printf("┌───── Node %-3d Registry ─────┐\n", node.id)
-			fmt.Printf("│ %-3s │ %-21s │\n", "ID", "Address")
-			fmt.Println("├─────┼───────────────────────┤")
-
-			for _, node := range node.registry.Peers {
-				formattedId := fmt.Sprintf("│ %3d │ %21s │", node.Id, node.Address)
-				fmt.Println(formattedId)
-			}
-
-			fmt.Println("└─────┴───────────────────────┘")
-		}
-	*/
+	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s │\n"
 
 	// Change this print to a table
+	columns := []string{"Current term", "Voted for", "State", "Commit index", "Last applied", "Next index", "Match index"}
+	data := []string{
+		fmt.Sprintf("%d", state.CurrentTerm),
+		fmt.Sprintf("%s", state.VotedFor),
+		fmt.Sprintf("%s", state.state.String()),
+		fmt.Sprintf("%d", state.CommitIndex),
+		fmt.Sprintf("%d", state.LastApplied),
+		fmt.Sprintf("%d", state.NextIndex),
+		fmt.Sprintf("%d", state.MatchIndex),
+	}
 
-	fmt.Println("│ Current term: ", state.CurrentTerm)
-	fmt.Println("│ Voted for: ", state.VotedFor)
-	fmt.Println("│ State: ", state.state)
-	fmt.Println("│ Commit index: ", state.CommitIndex)
-	fmt.Println("│ Last applied: ", state.LastApplied)
-	fmt.Println("│ Next index: ", state.NextIndex)
-	fmt.Println("│ Match index: ", state.MatchIndex)
-	println()
+	fmt.Printf("\n┌──────────────────┬" + strings.Repeat("─", dataColumnLength+2) + "┐\n")
+	for i := 0; i < len(columns); i++ {
+		fmt.Printf(format, columns[i], data[i])
+	}
+	fmt.Printf("└──────────────────┴" + strings.Repeat("─", dataColumnLength+2) + "┘\n")
 }
 
 func (state *State) logCommandHandler() {
-	fmt.Println("log command")
 
 	filenamePath := "./" + "server-" + strings.Replace(state.MyName, ":", "-", 1) + ".log"
 
