@@ -22,4 +22,3 @@ func IsValidCommand(s string) bool {
 	}
 	return true
 }
-

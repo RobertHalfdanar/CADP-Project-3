@@ -97,7 +97,7 @@ func ReadFromUDPConn(conn *net.UDPConn, msg *Raft.Raft) (*net.UDPAddr, error) {
 
 func WriteToUDPConn(conn *net.UDPConn, addr *net.UDPAddr, msg *Raft.Raft) error {
 	Logger.Log(Logger.INFO, "Sending message to: "+addr.String())
-	
+
 	msgByte, err := proto.Marshal(msg)
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to marshal: "+err.Error())

@@ -255,6 +255,14 @@ func (state *State) Server() {
 			}
 		*/
 
+		state.lock.RLock()
+		if state.state == Failed {
+			Logger.Log(Logger.INFO, "Dropping message from address: "+address.String()+", in a failed state")
+			state.lock.RUnlock()
+			continue
+		}
+		state.lock.RUnlock()
+
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		state.messagesHandler(msg, address)
 
