@@ -29,6 +29,20 @@ const (
 	Failed
 )
 
+func (e RaftState) String() string {
+	switch e {
+	case Follower:
+		return "Follower"
+	case Candidate:
+		return "Candidate"
+	case Leader:
+		return "Leader"
+	case Failed:
+		return "Failed"
+	}
+	return "Unknown"
+}
+
 type Entry = Raft.LogEntry
 
 type State struct {

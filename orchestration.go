@@ -155,9 +155,10 @@ func simulation() {
 		time.Sleep(20 * time.Second)
 		for _, server := range servers {
 			server.sendCommand("print")
+			fmt.Println("Printed")
+
 		}
 
-		fmt.Println("Printed")
 	}
 
 }
