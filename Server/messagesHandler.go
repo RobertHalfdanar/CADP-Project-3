@@ -164,6 +164,16 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 	state.lock.Lock()
 	defer state.lock.Unlock()
 
+	if state.state == Leader {
+		if request.Term > state.CurrentTerm {
+			state.state = Follower
+		} else {
+			return
+		}
+	} else {
+		state.state = Follower
+	}
+
 	timer.resetTimer()
 
 	// if and return -> AppendEntriesFails

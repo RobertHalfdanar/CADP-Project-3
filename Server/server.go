@@ -360,8 +360,7 @@ func (state *State) startLeaderElection() {
 func (state *State) repl() {
 	// TODO: Continuously read from stdin and handle the commands.
 	reader := bufio.NewReader(os.Stdin)
-	for {
-	}
+
 	for {
 		fmt.Print("Command> ")
 		cmd, err := reader.ReadString('\n')
