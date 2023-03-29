@@ -48,8 +48,8 @@ func (state *State) printCommandHandler() {
 	fmt.Println("│ State: ", state.state)
 	fmt.Println("│ Commit index: ", state.CommitIndex)
 	fmt.Println("│ Last applied: ", state.LastApplied)
-	fmt.Println("Next index: ", state.NextIndex)
-	fmt.Println("Match index: ", state.MatchIndex)
+	fmt.Println("│ Next index: ", state.NextIndex)
+	fmt.Println("│ Match index: ", state.MatchIndex)
 	println()
 }
 

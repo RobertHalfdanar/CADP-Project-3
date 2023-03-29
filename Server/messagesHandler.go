@@ -4,7 +4,6 @@ import (
 	"CADP-Project-3/Logger"
 	"CADP-Project-3/Raft"
 	"CADP-Project-3/Utils"
-	"fmt"
 	"math"
 	"net"
 	"strconv"
@@ -86,7 +85,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 		state.votes++
 	}
 
-	if state.votes < len(state.Servers)/2 {
+	if state.votes < int(math.Ceil(float64(len(state.Servers))/2.0)) {
 		return
 	}
 
@@ -151,8 +150,6 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 	// The leader has committed more entries than we have
 	numberOfCommits := state.CommitIndex - prevCommitted
 
-	fmt.Println("Committing entries: ", numberOfCommits)
-
 	for ; numberOfCommits > 0; numberOfCommits-- {
 		// Commit entries until we reach the leader commit index
 		state.commitEntry()
@@ -196,7 +193,6 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 	}
 
 	if request.LeaderCommit > state.CommitIndex {
-		fmt.Println("This should happen")
 		state.commitEntries(request)
 	}
 
@@ -239,8 +235,6 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	for _, matchIndex := range state.MatchIndex {
 
-		fmt.Println("Index: ", matchIndex)
-
 		count, ok := countIndex[matchIndex]
 
 		if !ok {
@@ -252,7 +246,7 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	leaderCommitIndex := state.CommitIndex
 
-	majority := (len(state.Servers) - 1) / 2
+	majority := int(math.Ceil(float64(len(state.Servers)) / 2.0))
 
 	for k, v := range countIndex {
 		if v > majority && k > leaderCommitIndex {
@@ -261,7 +255,6 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 			break
 		}
 	}
-
 	state.lock.Unlock()
 }
 

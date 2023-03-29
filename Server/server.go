@@ -180,7 +180,6 @@ func (state *State) sendHeartbeat() {
 		}
 
 		//  2 - 1 = 1
-		fmt.Println("NextIndex: ", state.NextIndex[i])
 
 		if uint64(len(state.Log)) > state.NextIndex[i]-1 {
 

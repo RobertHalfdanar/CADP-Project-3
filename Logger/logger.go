@@ -106,7 +106,6 @@ func Log(level LogLevel, message string) {
 	// Currently disabled because we are getting inputs from the users
 	// colorFormattedMessage := logFormatter(message, "NULL", level, true)
 	// printLog(colorFormattedMessage)
-
 	writeLog(formattedMessage)
 }
 
@@ -117,6 +116,5 @@ func LogWithHost(level LogLevel, host string, message string) {
 
 	// colorFormattedMessage := logFormatter(message, host, level, true)
 	// printLog(colorFormattedMessage)
-
 	writeLog(formattedMessage)
 }
