@@ -373,7 +373,7 @@ func (state *State) repl() {
 		// Remove leading and trailing whitespace
 		cmd = strings.TrimSpace(cmd)
 
-		commandsHandler(cmd)
+		state.commandsHandler(cmd)
 	}
 }
 
