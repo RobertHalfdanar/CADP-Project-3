@@ -94,6 +94,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
 	state.lock.Lock()
+	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
 
@@ -122,7 +123,6 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	state.state = Leader
 
 	// Send a message to all other servers
-	state.lock.Unlock()
 }
 
 func (state *State) AppendEntriesFails(address *net.UDPAddr) {
@@ -175,6 +175,7 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		state.commitEntry()
 	}
 
+	state.LastApplied = state.CommitIndex
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
