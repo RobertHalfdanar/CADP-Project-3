@@ -96,7 +96,6 @@ func (timer *Timer) increaseTimer(amount time.Duration) {
 func (timer *Timer) resetTimer() {
 	timer.lock.Lock()
 	defer timer.lock.Unlock()
-
 	timer.timer = 0
 }
 
