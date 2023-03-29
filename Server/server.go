@@ -53,6 +53,8 @@ type State struct {
 	leftToVote        []*net.UDPAddr               // How has voted
 	lastAppendRequest []*Raft.AppendEntriesRequest // Did we get a response?
 
+	leader *net.UDPAddr
+
 	lock sync.RWMutex
 }
 

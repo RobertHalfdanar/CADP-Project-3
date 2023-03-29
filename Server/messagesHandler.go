@@ -9,17 +9,37 @@ import (
 	"strconv"
 )
 
-func (state *State) commandMessageHandler(command string) {
+func (state *State) forwardToLeader(command string) {
+	if state.leader == nil {
+		Logger.Log(Logger.INFO, "No leader, can't forward")
+		return
+	}
 
+	message := &Raft.Raft{Message: &Raft.Raft_CommandName{CommandName: command}}
+	state.sendTo(state.leader, message)
+
+	Logger.Log(Logger.INFO, "Command forwarded to leader")
+}
+
+func (state *State) commandMessageHandler(command string) {
 	state.lock.Lock()
 	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Handling command message...")
+	if state.state == Candidate {
+		Logger.Log(Logger.INFO, "Dropping command, I am candidate")
+		return
+	} else if state.state == Follower {
+		Logger.Log(Logger.INFO, "Forwarding to leader...")
+		state.forwardToLeader(command)
+		return
+	}
 
 	newEntry := &Raft.LogEntry{CommandName: command, Term: state.CurrentTerm, Index: uint64(len(state.Log) + 1)}
 	state.Log = append(state.Log, newEntry)
 
 	index := Utils.Find(state.Servers, Utils.CreateUDPAddr(state.MyName))
+	state.NextIndex[index]++
 	state.MatchIndex[index]++
 }
 
@@ -170,6 +190,8 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 	} else {
 		state.state = Follower
 	}
+
+	state.leader = address
 
 	timer.resetTimer()
 
