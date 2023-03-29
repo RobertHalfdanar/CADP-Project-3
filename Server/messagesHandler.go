@@ -185,9 +185,7 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 
 	if request.LeaderCommit > state.CommitIndex {
 		fmt.Println("This should happen")
-		state.lock.Unlock()
 		state.commitEntries(request)
-		state.lock.Lock()
 	}
 
 	if len(request.Entries) > 0 {
@@ -241,7 +239,7 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	}
 
 	leaderCommitIndex := state.CommitIndex
-	state.lock.Unlock()
+
 	majority := (len(state.Servers) - 1) / 2
 
 	for k, v := range countIndex {
@@ -250,6 +248,8 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 			break
 		}
 	}
+
+	state.lock.Unlock()
 }
 
 func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {

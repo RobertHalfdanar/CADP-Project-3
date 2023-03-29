@@ -147,9 +147,6 @@ func (state *State) Init() {
 }
 
 func (state *State) commitEntry() {
-	state.lock.Lock()
-	defer state.lock.Unlock()
-
 	Logger.Log(Logger.INFO, "Committing entry...")
 
 	state.CommitIndex++
