@@ -68,6 +68,10 @@ func (state *State) resumeCommandHandler() {
 	state.lock.Lock()
 	defer state.lock.Unlock()
 
+	if state.state != Failed {
+		return
+	}
+
 	state.state = Follower
 	timer.resetTimer(true)
 
@@ -77,6 +81,10 @@ func (state *State) resumeCommandHandler() {
 func (state *State) suspendCommandHandler() {
 	state.lock.Lock()
 	defer state.lock.Unlock()
+
+	if state.state == Failed {
+		return
+	}
 
 	state.state = Failed
 	fmt.Println("\033[33mThis server is suspended\033[0m")
