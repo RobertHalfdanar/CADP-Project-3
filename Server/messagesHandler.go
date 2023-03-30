@@ -122,7 +122,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 
 	for i := range state.NextIndex {
 		state.NextIndex[i] = uint64(len(state.Log) + 1)
-		state.MatchIndex[i] = 0
+		state.MatchIndex[i] = state.CommitIndex
 	}
 
 	Logger.Log(Logger.INFO, "I am the leader!, and I have "+fmt.Sprintf("%d", state.votes)+" votes")
@@ -222,6 +222,8 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		state.newEntry(request)
 	}
 
+	state.CurrentTerm = request.Term
+
 	if request.LeaderCommit > state.CommitIndex {
 		state.commitEntries(request)
 	}
@@ -279,7 +281,10 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	majority := int(math.Ceil(float64(len(state.Servers)) / 2.0))
 
 	for k, v := range countIndex {
+		fmt.Println(v, ">=", majority, "&&", k, ">", leaderCommitIndex)
+		//  3 >= 3 && 3 > 2
 		if v >= majority && k > leaderCommitIndex {
+			fmt.Println("Yo")
 			state.CommitIndex = k
 			state.LastApplied = k
 			state.commitEntry()
