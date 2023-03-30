@@ -281,6 +281,7 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	for k, v := range countIndex {
 		if v >= majority && k > leaderCommitIndex {
 			state.CommitIndex = k
+			state.LastApplied = k
 			state.commitEntry()
 			break
 		}
