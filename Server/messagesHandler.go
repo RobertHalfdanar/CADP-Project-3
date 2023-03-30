@@ -4,6 +4,7 @@ import (
 	"CADP-Project-3/Logger"
 	"CADP-Project-3/Raft"
 	"CADP-Project-3/Utils"
+	"fmt"
 	"math"
 	"net"
 	"strconv"
@@ -96,6 +97,10 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	state.lock.Lock()
 	defer state.lock.Unlock()
 
+	if state.state != Candidate {
+		return
+	}
+
 	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
 
 	// Remove the server that has voted
@@ -110,6 +115,8 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 		return
 	}
 
+	// I have received enough votes to become the leader
+
 	state.NextIndex = make([]uint64, len(state.Servers))
 	state.MatchIndex = make([]uint64, len(state.Servers))
 
@@ -118,7 +125,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 		state.MatchIndex[i] = 0
 	}
 
-	Logger.Log(Logger.INFO, "I am the leader!")
+	Logger.Log(Logger.INFO, "I am the leader!, and I have "+fmt.Sprintf("%d", state.votes)+" votes")
 
 	state.state = Leader
 

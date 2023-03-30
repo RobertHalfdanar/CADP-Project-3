@@ -15,7 +15,7 @@ import (
 type Node struct {
 	cmd        *exec.Cmd
 	address    string
-	pipeWriter *io.PipeWriter
+	pipeWriter *io.WriteCloser
 }
 
 func (node *Node) Start() {
@@ -27,8 +27,11 @@ func (node *Node) Start() {
 }
 
 func (node *Node) sendCommand(command string) {
-	_, err := node.pipeWriter.Write([]byte(command + "\n"))
 
+	_, err := io.Writer(*node.pipeWriter).Write([]byte(command + "\n"))
+	if err != nil {
+		panic(err)
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +44,6 @@ var suspendedServers []*Node
 var maxSus = 1
 
 func createNode(fileToExec string, address string, processFilepath string, args ...string) *Node {
-	r, w := io.Pipe()
 
 	tmp := []string{"run", fileToExec, address}
 	tmp = append(tmp, args...)
@@ -55,15 +57,16 @@ func createNode(fileToExec string, address string, processFilepath string, args 
 		panic(err)
 	}
 
-	cmd.Stdin = r
 	cmd.Stdout = file
 	cmd.Stderr = os.Stderr
 	cmd.WaitDelay = time.Millisecond
 
+	stdin, err := cmd.StdinPipe()
+
 	node := &Node{
 		address:    address,
 		cmd:        cmd,
-		pipeWriter: w,
+		pipeWriter: &stdin,
 	}
 
 	return node
@@ -108,7 +111,7 @@ func main() {
 
 	initCommands()
 
-	simulateSuspend()
+	simulation()
 
 }
 
@@ -160,7 +163,10 @@ func simulation() {
 	for {
 		time.Sleep(5 * time.Second)
 		for _, server := range servers {
+
+			fmt.Println("Sending print command to server: " + server.address)
 			server.sendCommand("print")
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 

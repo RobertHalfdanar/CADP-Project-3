@@ -20,15 +20,16 @@ func (state *State) printCommandHandler() {
 
 	dataColumnLength := 16
 
-	if len(state.Servers)*3 > 16 {
-		dataColumnLength = len(state.Servers)*3 + 4
+	if len(state.Servers)*3 > 16 && state.state == Leader {
+		dataColumnLength = len(state.Servers)*2 + 4
 	}
 
 	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s │\n"
 
 	// Change this print to a table
-	columns := []string{"Current term", "Voted for", "State", "Commit index", "Last applied", "Next index", "Match index"}
+	columns := []string{"My address", "Current term", "Voted for", "State", "Commit index", "Last applied", "Next index", "Match index"}
 	data := []string{
+		fmt.Sprintf("%s", state.MyName),
 		fmt.Sprintf("%d", state.CurrentTerm),
 		fmt.Sprintf("%s", state.VotedFor),
 		fmt.Sprintf("%s", state.state.String()),
