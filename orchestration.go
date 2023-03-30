@@ -8,14 +8,17 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
 type Node struct {
-	cmd        *exec.Cmd
-	address    string
-	pipeWriter *io.WriteCloser
+	cmd         *exec.Cmd
+	address     string
+	pipeWriter  *io.WriteCloser
+	isSuspended bool
 }
 
 func (node *Node) Start() {
@@ -72,7 +75,80 @@ func createNode(fileToExec string, address string, processFilepath string, args 
 	return node
 }
 
+func cleanup() {
+
+	var receivedCommands [][]string
+	error := false
+
+	for index, server := range servers {
+		if index == 0 {
+			// Read from file
+			file, _ := os.OpenFile("./server-"+strings.Replace(server.address, ":", "-", 1)+".log", os.O_RDONLY, 0644)
+
+			scanner := bufio.NewScanner(file)
+
+			for scanner.Scan() {
+				row := scanner.Text()
+
+				columns := strings.Split(row, " ")[2]
+
+				receivedCommands = append(receivedCommands, strings.Split(columns, ","))
+			}
+		}
+
+		file, _ := os.OpenFile("./server-"+strings.Replace(server.address, ":", "-", 1)+".log", os.O_RDONLY, 0644)
+
+		scanner := bufio.NewScanner(file)
+
+		rowNumber := 0
+		for scanner.Scan() {
+			row := scanner.Text()
+
+			tmp := strings.Split(row, " ")[2]
+			columns := strings.Split(tmp, ",")
+
+			if rowNumber > len(receivedCommands)-1 {
+				error = true
+			}
+
+			if columns[0] != receivedCommands[rowNumber][0] {
+				error = true
+
+			}
+			if columns[1] != receivedCommands[rowNumber][1] {
+				error = true
+
+			}
+			if columns[2] != receivedCommands[rowNumber][2] {
+				error = true
+			}
+
+			rowNumber++
+		}
+	}
+	if !error {
+		fmt.Println("All commands are the same for the servers!")
+	} else {
+		fmt.Println("Commands are not the same!")
+	}
+
+	for index, receivedCommand := range receivedCommands {
+		if receivedCommand[2] != commands[index] {
+			fmt.Println(receivedCommand[2], commands[index])
+			fmt.Printf("\"%s\" command was not recived ", commands[index])
+		}
+	}
+}
+
 func main() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cleanup()
+		os.Exit(1)
+	}()
+
 	// read config file
 	fileName := "config.local.txt"
 	nClients := 1
@@ -111,7 +187,7 @@ func main() {
 
 	initCommands()
 
-	simulation()
+	simulateSuspend()
 
 }
 
@@ -139,7 +215,7 @@ func sendToServer(client *Node) {
 	for _, client := range clients {
 		for _, command := range commands {
 			client.sendCommand(command)
-			time.Sleep(2 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -161,12 +237,13 @@ func simulation() {
 
 	// Sending commands to servers
 	for {
-		time.Sleep(5 * time.Second)
+
+		time.Sleep(10 * time.Second)
 		for _, server := range servers {
 
 			fmt.Println("Sending print command to server: " + server.address)
 			server.sendCommand("print")
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -193,15 +270,12 @@ func simulateSuspend() {
 	// Give time for a leader to emerge
 	time.Sleep(10 * time.Second)
 
-	timeStart := time.Now()
-	resumed := false
-
-	servers[1].sendCommand("suspend")
-
 	// Client in its own thread
 	go sendToServer(clients[0])
 
 	// Sending commands to servers
+
+	timeStart := time.Now()
 	for {
 		time.Sleep(5 * time.Second)
 
@@ -210,10 +284,32 @@ func simulateSuspend() {
 			server.sendCommand("print")
 		}
 
-		if currentTime.Sub(timeStart).Seconds() >= 20 && !resumed {
-			servers[1].sendCommand("resume")
-			resumed = true
-			fmt.Println("Server resumed!")
+		// Every 2 seconds suspend a random server
+		if currentTime.Sub(timeStart).Seconds() > 2 {
+			server := servers[rand.Int31n(int32(len(servers)))]
+
+			if rand.Int31n(2) == 1 {
+
+				if !server.isSuspended {
+					continue
+				}
+
+				fmt.Println("Resuming server: " + server.address)
+				server.sendCommand("resume")
+				server.isSuspended = false
+
+			} else {
+				if server.isSuspended {
+					continue
+				}
+
+				fmt.Println("Suspending server: " + server.address)
+
+				server.sendCommand("suspend")
+				server.isSuspended = true
+			}
+
+			timeStart = time.Now()
 		}
 	}
 }

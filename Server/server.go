@@ -171,8 +171,12 @@ func (state *State) Init() {
 func (state *State) commitEntry() {
 	Logger.Log(Logger.INFO, "Committing entry...")
 
+	if state.LastApplied < 1 {
+		return
+	}
+
 	// log commit index entry
-	log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.CommitIndex-1].Term, state.Log[state.CommitIndex-1].Index, state.Log[state.CommitIndex-1].CommandName))
+	log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied-1].Term, state.Log[state.LastApplied-1].Index, state.Log[state.LastApplied-1].CommandName))
 }
 
 func (state *State) sendHeartbeat() {

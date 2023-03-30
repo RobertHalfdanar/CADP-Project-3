@@ -55,7 +55,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	Logger.Log(Logger.INFO, strconv.Itoa(int(state.CurrentTerm)))
 	Logger.Log(Logger.INFO, strconv.Itoa(int(request.Term)))
 
-	if state.CurrentTerm > request.Term {
+	if state.CurrentTerm >= request.Term {
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
@@ -64,7 +64,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		// I vote for myself and can only vote for one candidate
 		raftResponse.VoteGranted = false
 
-	} else if state.LastApplied > request.LastLogIndex {
+	} else if uint64(len(state.Log)) > request.LastLogIndex {
 		// If our log index is large then the request log index, then we reject the request
 		// I have more logs
 		raftResponse.VoteGranted = false
@@ -75,6 +75,9 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		state.CurrentTerm = request.Term
 		state.state = Follower
 		state.VotedFor = address
+		state.MatchIndex = []uint64{}
+		state.NextIndex = []uint64{}
+
 		timer.resetTimer(true)
 
 		raftResponse.VoteGranted = true
@@ -165,8 +168,6 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		newEntry = request.Entries[0]
 	}
 
-	prevCommitted := state.CommitIndex
-
 	if request.LeaderCommit < newEntry.Index {
 		// The new entry has not been committed
 		state.CommitIndex = request.LeaderCommit
@@ -174,15 +175,10 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		state.CommitIndex = newEntry.Index
 	}
 
-	// The leader has committed more entries than we have
-	numberOfCommits := state.CommitIndex - prevCommitted
-
-	for ; numberOfCommits > 0; numberOfCommits-- {
-		// Commit entries until we reach the leader commit index
+	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
 		state.commitEntry()
 	}
 
-	state.LastApplied = state.CommitIndex
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
@@ -213,7 +209,7 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		return
 
 	} else if uint64(len(state.Log)) > request.PrevLogIndex-1 && state.Log[request.PrevLogIndex-1].Term != request.PrevLogTerm {
-		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+		//		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
 		state.AppendEntriesFails(address)
 		return
@@ -242,6 +238,12 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
 	state.lock.Lock()
+
+	// If new leader was elected, ignore response I am leader no more
+	if state.state != Leader {
+		state.lock.Unlock()
+		return
+	}
 
 	Logger.Log(Logger.INFO, "Handling entries response...")
 
@@ -281,12 +283,9 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	majority := int(math.Ceil(float64(len(state.Servers)) / 2.0))
 
 	for k, v := range countIndex {
-		fmt.Println(v, ">=", majority, "&&", k, ">", leaderCommitIndex)
-		//  3 >= 3 && 3 > 2
 		if v >= majority && k > leaderCommitIndex {
-			fmt.Println("Yo")
 			state.CommitIndex = k
-			state.LastApplied = k
+			state.LastApplied++
 			state.commitEntry()
 			break
 		}
