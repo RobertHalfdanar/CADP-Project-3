@@ -41,6 +41,26 @@ func (state *State) commandMessageHandler(command string) {
 	state.NextIndex[index]++
 }
 
+func (state *State) upToDate(index uint64, term uint64) bool {
+	if len(state.Log) == 0 {
+		return true
+	}
+
+	if state.Log[state.CommitIndex-1].Term < term {
+		return true
+	} else if state.Log[state.CommitIndex-1].Term > term {
+		return false
+	}
+
+	if uint64(len(state.Log)) > index {
+		return false
+	} else if uint64(len(state.Log)) < index {
+		return true
+	}
+
+	return true
+}
+
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
 
 	Logger.Log(Logger.INFO, "Handling request vote message from "+address.String())
@@ -48,20 +68,11 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	raftResponse := &Raft.RequestVoteResponse{}
 	raftResponse.Term = state.CurrentTerm
 
-	if state.CurrentTerm >= request.Term {
+	if request.Term < state.CurrentTerm {
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
-	} else if state.VotedFor == nil && state.CurrentTerm == request.Term {
-		// If the request term is equal to the current term, and we are a candidate, then we reject the request
-		// I vote for myself and can only vote for one candidate
-		raftResponse.VoteGranted = false
-
-	} else if state.CurrentTerm == request.Term && state.CommitIndex > request.LastLogIndex {
-		// If our log index is large then the request log index, then we reject the request
-		// I have more logs
-		raftResponse.VoteGranted = false
-	} else {
+	} else if state.upToDate(request.LastLogIndex, request.LastLogTerm) {
 		// We vote for the candidate
 		state.CurrentTerm = request.Term
 		state.state = Follower
@@ -70,6 +81,8 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		state.NextIndex = []uint64{}
 
 		raftResponse.VoteGranted = true
+	} else {
+		raftResponse.VoteGranted = false
 	}
 
 	envelope := &Raft.Raft{}
