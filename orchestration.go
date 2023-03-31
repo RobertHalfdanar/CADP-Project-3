@@ -187,8 +187,10 @@ func main() {
 
 	initCommands()
 
-	simulateSuspend()
+	//simulateSuspend()
 
+	//simulateOneSuspend()
+	simulation()
 }
 
 var commands []string
@@ -258,6 +260,54 @@ func simulation() {
 
 }
 
+func simulateOneSuspend() {
+	for _, server := range servers {
+		server.Start()
+	}
+
+	for _, client := range clients {
+		client.Start()
+	}
+
+	// Give time for a leader to emerge
+	time.Sleep(10 * time.Second)
+
+	// Client in its own thread
+	go sendToServer(clients[0])
+
+	// Sending commands to servers
+
+	timeStart := time.Now()
+	timer2 := time.Now()
+
+	for {
+		time.Sleep(200 * time.Millisecond)
+
+		currentTime := time.Now()
+		for _, server := range servers {
+			server.sendCommand("print")
+		}
+
+		if currentTime.Sub(timer2).Seconds() > 30 {
+			servers[3].sendCommand("resume")
+			break
+		}
+
+		if currentTime.Sub(timeStart).Seconds() > 5 {
+			servers[3].sendCommand("suspend")
+			timeStart = time.Now()
+		}
+	}
+
+	time.Sleep(10 * time.Second)
+
+	for _, server := range servers {
+		server.sendCommand("print")
+	}
+
+	time.Sleep(1 * time.Second)
+}
+
 func simulateSuspend() {
 	for _, server := range servers {
 		server.Start()
@@ -276,12 +326,25 @@ func simulateSuspend() {
 	// Sending commands to servers
 
 	timeStart := time.Now()
+	timer2 := time.Now()
+
 	for {
 		time.Sleep(5 * time.Second)
 
 		currentTime := time.Now()
 		for _, server := range servers {
 			server.sendCommand("print")
+		}
+
+		if currentTime.Sub(timer2).Seconds() > 5 {
+			fmt.Println("Simulation ended!")
+			for _, server := range servers {
+				if server.isSuspended {
+					server.sendCommand("resume")
+				}
+			}
+
+			break
 		}
 
 		// Every 2 seconds suspend a random server
@@ -312,4 +375,12 @@ func simulateSuspend() {
 			timeStart = time.Now()
 		}
 	}
+
+	time.Sleep(10 * time.Second)
+
+	for _, server := range servers {
+		server.sendCommand("print")
+	}
+
+	time.Sleep(1 * time.Second)
 }

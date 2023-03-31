@@ -171,12 +171,9 @@ func (state *State) Init() {
 func (state *State) commitEntry() {
 	Logger.Log(Logger.INFO, "Committing entry...")
 
-	if state.LastApplied < 1 {
-		return
+	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
+		log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied].Term, state.Log[state.LastApplied].Index, state.Log[state.LastApplied].CommandName))
 	}
-
-	// log commit index entry
-	log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied-1].Term, state.Log[state.LastApplied-1].Index, state.Log[state.LastApplied-1].CommandName))
 }
 
 func (state *State) sendHeartbeat() {
@@ -247,7 +244,6 @@ func (state *State) flush() {
 	}
 }
 
-// This is the server loop
 func (state *State) Server() {
 
 	// TODO: Configure timeouts, read from the UDP connection, handle incoming messages and update state.
@@ -304,9 +300,6 @@ func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
 }
 
 func (state *State) sendToAll(message *Raft.Raft) {
-	state.lock.RLock()
-	defer state.lock.RUnlock()
-
 	for _, addr := range state.Servers {
 		if addr.String() == state.MyName {
 			continue
@@ -349,6 +342,7 @@ func (state *State) resendRequestVoteMessage() {
 
 func (state *State) startLeaderElection() {
 	state.lock.Lock()
+	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
@@ -383,7 +377,6 @@ func (state *State) startLeaderElection() {
 		LastLogTerm:   lastLogTerm,
 	},
 	}}
-	state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Sending request vote to all other servers")
 

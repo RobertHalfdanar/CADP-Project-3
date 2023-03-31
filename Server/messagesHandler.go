@@ -23,8 +23,6 @@ func (state *State) forwardToLeader(command string) {
 }
 
 func (state *State) commandMessageHandler(command string) {
-	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Handling command message...")
 	if state.state == Candidate {
@@ -45,7 +43,6 @@ func (state *State) commandMessageHandler(command string) {
 }
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
-	state.lock.Lock()
 
 	Logger.Log(Logger.INFO, "Handling request vote message...")
 
@@ -86,7 +83,6 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 	envelope := &Raft.Raft{}
 	envelope.Message = &Raft.Raft_RequestVoteResponse{RequestVoteResponse: raftResponse}
 
-	state.lock.Unlock()
 	state.sendTo(address, envelope)
 
 	if raftResponse.VoteGranted {
@@ -97,9 +93,6 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 }
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
-	state.lock.Lock()
-	defer state.lock.Unlock()
-
 	if state.state != Candidate {
 		return
 	}
@@ -114,7 +107,9 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 		state.votes++
 	}
 
-	if state.votes < int(math.Ceil(float64(len(state.Servers))/2.0)) {
+	majority := int(math.Floor(float64(len(state.Servers))/2.0)) + 1
+
+	if state.votes < majority {
 		return
 	}
 
@@ -131,7 +126,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	Logger.Log(Logger.INFO, "I am the leader!, and I have "+fmt.Sprintf("%d", state.votes)+" votes")
 
 	state.state = Leader
-
+	state.sendHeartbeat()
 	// Send a message to all other servers
 }
 
@@ -175,16 +170,10 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		state.CommitIndex = newEntry.Index
 	}
 
-	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
-		state.commitEntry()
-	}
-
+	state.commitEntry()
 }
 
 func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntriesRequest, address *net.UDPAddr) {
-	state.lock.Lock()
-	defer state.lock.Unlock()
-
 	if state.state == Leader {
 		if request.Term > state.CurrentTerm {
 			state.state = Follower
@@ -237,11 +226,8 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 }
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
-	state.lock.Lock()
-
 	// If new leader was elected, ignore response I am leader no more
 	if state.state != Leader {
-		state.lock.Unlock()
 		return
 	}
 
@@ -254,7 +240,6 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	if response.Success == false {
 		state.NextIndex[addressIndex]--
-		state.lock.Unlock()
 		return
 	}
 
@@ -280,30 +265,40 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	leaderCommitIndex := state.CommitIndex
 
-	majority := int(math.Ceil(float64(len(state.Servers)) / 2.0))
+	majority := int(math.Floor(float64(len(state.Servers))/2.0)) + 1
 
 	for k, v := range countIndex {
 		if v >= majority && k > leaderCommitIndex {
 			state.CommitIndex = k
-			state.LastApplied++
 			state.commitEntry()
 			break
 		}
 	}
-	state.lock.Unlock()
 }
 
 func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
+	state.lock.Lock()
+	defer state.lock.Unlock()
+
 	switch v := raft.Message.(type) {
 	case *Raft.Raft_CommandName:
 		state.commandMessageHandler(v.CommandName)
 	case *Raft.Raft_RequestVoteRequest:
 		state.requestVoteMessageHandler(v.RequestVoteRequest, address)
 	case *Raft.Raft_RequestVoteResponse:
+		if state.state != Candidate {
+			return
+		}
 		state.requestVoteResponseMessageHandler(v.RequestVoteResponse, address)
 	case *Raft.Raft_AppendEntriesRequest:
+		if state.state != Follower {
+			return
+		}
 		state.appendEntriesRequestMessageHandler(v.AppendEntriesRequest, address)
 	case *Raft.Raft_AppendEntriesResponse:
+		if state.state != Leader {
+			return
+		}
 		state.appendEntriesResponseMessageHandler(v.AppendEntriesResponse, address)
 	}
 }
