@@ -15,8 +15,6 @@ suspend
 */
 
 func (state *State) printCommandHandler() {
-	state.lock.RLock()
-	defer state.lock.RUnlock()
 
 	dataColumnLength := 16
 
@@ -65,22 +63,17 @@ func (state *State) logCommandHandler() {
 }
 
 func (state *State) resumeCommandHandler() {
-	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	if state.state != Failed {
 		return
 	}
 
 	state.state = Follower
-	timer.resetTimer(true)
 
 	fmt.Println("\033[32mThis server is resumed\033[0m")
 }
 
 func (state *State) suspendCommandHandler() {
-	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	if state.state == Failed {
 		return

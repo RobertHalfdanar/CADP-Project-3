@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	BroadcastTime   = 20 * time.Millisecond
-	ElectionTimeout = 20 * BroadcastTime
+	BroadcastTime    = 20 * time.Millisecond
+	ElectionTimeout  = 20 * BroadcastTime
+	RandomTimeoutMax = 300
+	RandomTimeoutMin = 150
 )
 
 // States of the Server, cf figure 4
@@ -29,6 +31,9 @@ const (
 	Leader
 	Failed
 )
+
+var command = make(chan string)
+var hasFinishedExecutingCommand = make(chan bool)
 
 func (e RaftState) String() string {
 	switch e {
@@ -80,45 +85,47 @@ func (state *State) getState() RaftState {
 	return state.state
 }
 
-type Timer struct {
-	timer time.Duration
-	lock  sync.Mutex
-}
+/*
+	type Timer struct {
+		timer time.Duration
+		lock  sync.Mutex
+	}
 
 var timer Timer
 
-func (timer *Timer) increaseTimer(amount time.Duration) {
-	timer.lock.Lock()
-	defer timer.lock.Unlock()
+	func (timer *Timer) increaseTimer(amount time.Duration) {
+		timer.lock.Lock()
+		defer timer.lock.Unlock()
 
-	timer.timer += amount
-}
-
-func (timer *Timer) resetTimer(random bool) {
-	timer.lock.Lock()
-	defer timer.lock.Unlock()
-
-	if random {
-		stuff := rand.Int31n(300-150) + 150
-		timer.timer = ElectionTimeout - time.Duration(stuff)*time.Millisecond
-	} else {
-		timer.timer = 0
+		timer.timer += amount
 	}
-}
 
-func (timer *Timer) getTimer() time.Duration {
-	timer.lock.Lock()
-	defer timer.lock.Unlock()
+	func (timer *Timer) resetTimer(random bool) {
+		timer.lock.Lock()
+		defer timer.lock.Unlock()
 
-	return timer.timer
-}
+		if random {
+			stuff := rand.Int31n(300-150) + 150
+			timer.timer = ElectionTimeout - time.Duration(stuff)*time.Millisecond
+		} else {
+			timer.timer = 0
+		}
+	}
 
+	func (timer *Timer) getTimer() time.Duration {
+		timer.lock.Lock()
+		defer timer.lock.Unlock()
+
+		return timer.timer
+	}
+*/
 func (state *State) setServers(fileName string) {
 	file, err := os.OpenFile("./"+fileName, os.O_RDONLY, 0644)
 	defer file.Close()
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to locate config file!")
+		panic("Failed to locate config file")
 		os.Exit(-1)
 	}
 
@@ -137,6 +144,7 @@ func (state *State) setServers(fileName string) {
 
 	if isInFile == false {
 		Logger.Log(Logger.ERROR, "Self not in configuration file!")
+		panic("Self not in configuration file")
 		os.Exit(-1)
 	}
 }
@@ -148,9 +156,11 @@ func (state *State) Init() {
 
 	if len(os.Args) < 3 {
 		Logger.Log(Logger.ERROR, "Too few arguments")
+		panic("Too few arguments")
 		os.Exit(-1)
 	} else if len(os.Args) > 3 {
 		Logger.Log(Logger.ERROR, "Too few arguments")
+		panic("Too many arguments")
 		os.Exit(-1)
 	}
 
@@ -164,6 +174,7 @@ func (state *State) Init() {
 	state.Listener, err = Utils.CreateUDPListener(state.MyName)
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to create a udp listener!")
+		panic("Failed to create a udp listener!")
 		os.Exit(-1)
 	}
 }
@@ -202,8 +213,6 @@ func (state *State) sendHeartbeat() {
 			message.PrevLogTerm = state.Log[message.PrevLogIndex-1].Term
 		}
 
-		//  2 - 1 = 1
-
 		if uint64(len(state.Log)) > state.NextIndex[i]-1 {
 
 			message.Entries = append(message.Entries, state.Log[state.NextIndex[i]-1])
@@ -214,6 +223,8 @@ func (state *State) sendHeartbeat() {
 		state.sendTo(server, envelope)
 	}
 }
+
+/*
 
 func (state *State) flush() {
 	start := time.Now()
@@ -243,6 +254,7 @@ func (state *State) flush() {
 		time.Sleep(1 * time.Millisecond)
 	}
 }
+*/
 
 func (state *State) Server() {
 
@@ -251,42 +263,57 @@ func (state *State) Server() {
 	Logger.Log(Logger.INFO, "Server listening...")
 
 	failures := 0
+	var deadline time.Duration
 	for {
+
+		select {
+		case cmd := <-command:
+			// If I have received command handel it before reading requests
+			state.commandsHandler(cmd)
+			hasFinishedExecutingCommand <- true
+		default:
+			// If I have not received command read requests
+		}
+
+		if state.state == Follower {
+			// If the sate is Leader add random delay to the deadline,
+			// so that the leader election is not triggered at the same time for all the servers
+			randomDelay := time.Duration(rand.Int31n(RandomTimeoutMax-RandomTimeoutMin)+RandomTimeoutMin) * time.Millisecond
+			deadline = ElectionTimeout + randomDelay
+		} else {
+			deadline = BroadcastTime
+		}
+
 		msg := &Raft.Raft{}
-		address, err := Utils.ReadFromUDPConn(state.Listener, msg)
+		address, err := Utils.ReadFromUDPConn(state.Listener, msg, deadline)
 
 		if err != nil {
-			Logger.Log(Logger.WARNING, "Failed to read from UDP listener")
-			failures++
+			if os.IsTimeout(err) {
+				switch state.state {
+				case Follower:
+					state.startLeaderElection()
+				case Leader:
+					state.sendHeartbeat()
+				case Candidate:
+					state.resendRequestVoteMessage()
+				}
+			} else {
+				Logger.Log(Logger.WARNING, "Failed to read from UDP listener")
+				failures++
 
-			if failures == 3 {
-				Logger.Log(Logger.ERROR, "Too many failures stopping!")
-				os.Exit(-1)
+				if failures == 3 {
+					Logger.Log(Logger.ERROR, "Too many failures stopping!")
+					panic("Too many failures stopping!")
+				}
 			}
 
 			continue
 		}
+
 		failures = 0
-
-		/*
-			if !Utils.Contains(state.Servers, address) {
-				Logger.Log(Logger.WARNING, "Unknown address received!")
-				continue
-			}
-		*/
-
-		state.lock.RLock()
-		failed := state.state
-		state.lock.RUnlock()
-		if failed == Failed {
-			Logger.Log(Logger.INFO, "Dropping message from address: "+address.String()+", in a failed state")
-			continue
-		}
 
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
 		state.messagesHandler(msg, address)
-
-		// Logger.LogWithHost(Logger.INFO, address, "Received message")
 	}
 }
 
@@ -317,9 +344,6 @@ func (state *State) resendRequestVoteMessage() {
 
 	Logger.Log(Logger.INFO, "Resending request vote message...")
 
-	state.lock.RLock()
-	defer state.lock.RUnlock()
-
 	lastLogIndex := len(state.Log)
 
 	lastLogTerm := uint64(0)
@@ -341,8 +365,6 @@ func (state *State) resendRequestVoteMessage() {
 }
 
 func (state *State) startLeaderElection() {
-	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
@@ -384,21 +406,23 @@ func (state *State) startLeaderElection() {
 }
 
 func (state *State) repl() {
-	// TODO: Continuously read from stdin and handle the commands.
+
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Print("Command> ")
+		fmt.Print("\nCommand> ")
 		cmd, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		// Remove leading and trailing whitespace
 		cmd = strings.TrimSpace(cmd)
 
-		state.commandsHandler(cmd)
+		command <- cmd
+
+		if <-hasFinishedExecutingCommand {
+		}
 	}
 }
 
@@ -412,6 +436,7 @@ func (state *State) loggerInit() {
 	}
 
 	log.SetOutput(file)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 }
 
 func Start() {
@@ -430,7 +455,9 @@ func Start() {
 
 	state.Init()
 	state.loggerInit()
-	go state.Server()
-	go state.flush()
-	state.repl()
+	//go state.flush()
+	go state.repl()
+
+	state.Server()
+
 }

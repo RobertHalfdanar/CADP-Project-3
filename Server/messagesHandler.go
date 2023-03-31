@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"strconv"
 )
 
 func (state *State) forwardToLeader(command string) {
@@ -28,7 +27,7 @@ func (state *State) commandMessageHandler(command string) {
 	if state.state == Candidate {
 		Logger.Log(Logger.INFO, "Dropping command, I am candidate")
 		return
-	} else if state.state == Follower {
+	} else if state.state != Leader {
 		Logger.Log(Logger.INFO, "Forwarding to leader...")
 		state.forwardToLeader(command)
 		return
@@ -38,44 +37,37 @@ func (state *State) commandMessageHandler(command string) {
 	state.Log = append(state.Log, newEntry)
 
 	index := Utils.Find(state.Servers, Utils.CreateUDPAddr(state.MyName))
+	state.MatchIndex[index] = state.NextIndex[index]
 	state.NextIndex[index]++
-	state.MatchIndex[index]++
 }
 
 func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, address *net.UDPAddr) {
 
-	Logger.Log(Logger.INFO, "Handling request vote message...")
+	Logger.Log(Logger.INFO, "Handling request vote message from "+address.String())
 
 	raftResponse := &Raft.RequestVoteResponse{}
 	raftResponse.Term = state.CurrentTerm
-
-	Logger.Log(Logger.INFO, strconv.Itoa(int(state.CurrentTerm)))
-	Logger.Log(Logger.INFO, strconv.Itoa(int(request.Term)))
 
 	if state.CurrentTerm >= request.Term {
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
-	} else if state.state == Candidate && state.CurrentTerm == request.Term {
+	} else if state.VotedFor == nil && state.CurrentTerm == request.Term {
 		// If the request term is equal to the current term, and we are a candidate, then we reject the request
 		// I vote for myself and can only vote for one candidate
 		raftResponse.VoteGranted = false
 
-	} else if uint64(len(state.Log)) > request.LastLogIndex {
+	} else if state.CurrentTerm == request.Term && state.CommitIndex > request.LastLogIndex {
 		// If our log index is large then the request log index, then we reject the request
 		// I have more logs
 		raftResponse.VoteGranted = false
-
 	} else {
 		// We vote for the candidate
-
 		state.CurrentTerm = request.Term
 		state.state = Follower
 		state.VotedFor = address
 		state.MatchIndex = []uint64{}
 		state.NextIndex = []uint64{}
-
-		timer.resetTimer(true)
 
 		raftResponse.VoteGranted = true
 	}
@@ -93,10 +85,6 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 }
 
 func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVoteResponse, address *net.UDPAddr) {
-	if state.state != Candidate {
-		return
-	}
-
 	Logger.Log(Logger.INFO, "Received vote response from: "+address.String())
 
 	// Remove the server that has voted
@@ -120,7 +108,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 
 	for i := range state.NextIndex {
 		state.NextIndex[i] = uint64(len(state.Log) + 1)
-		state.MatchIndex[i] = state.CommitIndex
+		state.MatchIndex[i] = 0
 	}
 
 	Logger.Log(Logger.INFO, "I am the leader!, and I have "+fmt.Sprintf("%d", state.votes)+" votes")
@@ -133,8 +121,6 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 func (state *State) AppendEntriesFails(address *net.UDPAddr) {
 	appendEntriesResponse := &Raft.AppendEntriesResponse{}
 	appendEntriesResponse.Term = state.CurrentTerm
-
-	Logger.Log(Logger.INFO, "Append entries not successful, send response to leader")
 
 	state.sendTo(
 		address,
@@ -184,26 +170,30 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		state.state = Follower
 	}
 
+	state.VotedFor = nil
 	state.leader = address
-
-	timer.resetTimer(true)
 
 	// if and return -> AppendEntriesFails
 	// if There is an entry in the message
 	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-
 	if request.Term < state.CurrentTerm {
 		Logger.Log(Logger.INFO, "Append entries not successful, mismatching term")
 		state.AppendEntriesFails(address)
 		return
+		//    true 										0 < 0 false ||
+	} else if request.PrevLogIndex > 0 {
+		if uint64(len(state.Log)) <= request.PrevLogIndex-1 {
+			Logger.Log(Logger.INFO, "Append entries not successful, mismatching log index")
+			state.AppendEntriesFails(address)
+			return
+		} else if uint64(len(state.Log)) > request.PrevLogIndex-1 && state.Log[request.PrevLogIndex-1].Term != request.PrevLogTerm {
+			Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
+			state.AppendEntriesFails(address)
+			return
+		}
+	}
 
-	} else if uint64(len(state.Log)) > request.PrevLogIndex-1 && state.Log[request.PrevLogIndex-1].Term != request.PrevLogTerm {
-		//		// TODO  Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-		Logger.Log(Logger.INFO, "Append entries not successful, entry has mismatching term")
-		state.AppendEntriesFails(address)
-		return
-
-	} else if len(request.Entries) > 0 {
+	if len(request.Entries) > 0 {
 		state.newEntry(request)
 	}
 
@@ -227,9 +217,6 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 
 func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEntriesResponse, address *net.UDPAddr) {
 	// If new leader was elected, ignore response I am leader no more
-	if state.state != Leader {
-		return
-	}
 
 	Logger.Log(Logger.INFO, "Handling entries response...")
 
@@ -243,12 +230,8 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 		return
 	}
 
+	state.MatchIndex[addressIndex] = state.NextIndex[addressIndex]
 	state.NextIndex[addressIndex]++
-	state.MatchIndex[addressIndex]++
-
-	// TODO: If there exists an N such that N > commitIndex, a majority
-	//		 of matchIndex[i] ≥ N, and log[N].term == currentTerm:
-	//       set commitIndex = N (§5.3, §5.4)
 
 	countIndex := map[uint64]int{}
 
@@ -277,21 +260,22 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 }
 
 func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
-	state.lock.Lock()
-	defer state.lock.Unlock()
 
 	switch v := raft.Message.(type) {
 	case *Raft.Raft_CommandName:
 		state.commandMessageHandler(v.CommandName)
 	case *Raft.Raft_RequestVoteRequest:
+		if state.state == Failed {
+			break
+		}
 		state.requestVoteMessageHandler(v.RequestVoteRequest, address)
 	case *Raft.Raft_RequestVoteResponse:
-		if state.state != Candidate {
-			return
+		if state.state == Failed {
+			break
 		}
 		state.requestVoteResponseMessageHandler(v.RequestVoteResponse, address)
 	case *Raft.Raft_AppendEntriesRequest:
-		if state.state != Follower {
+		if state.state == Failed {
 			return
 		}
 		state.appendEntriesRequestMessageHandler(v.AppendEntriesRequest, address)
@@ -300,5 +284,7 @@ func (state *State) messagesHandler(raft *Raft.Raft, address *net.UDPAddr) {
 			return
 		}
 		state.appendEntriesResponseMessageHandler(v.AppendEntriesResponse, address)
+	default:
+		Logger.Log(Logger.ERROR, "Unknown message type")
 	}
 }

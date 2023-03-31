@@ -55,6 +55,7 @@ func CreatingTCPListener(address string) net.Listener {
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to created a TCP listener")
+		panic("Failed to create a TCP listener")
 		os.Exit(-1)
 	}
 
@@ -78,8 +79,14 @@ func CreateUDPListener(address string) (*net.UDPConn, error) {
 
 }
 
-func ReadFromUDPConn(conn *net.UDPConn, msg *Raft.Raft) (*net.UDPAddr, error) {
+func ReadFromUDPConn(conn *net.UDPConn, msg *Raft.Raft, deadline time.Duration) (*net.UDPAddr, error) {
 	buffer := make([]byte, 65535)
+
+	err := conn.SetReadDeadline(time.Now().Add(deadline))
+	if err != nil {
+		panic(err)
+	}
+
 	length, address, err := conn.ReadFromUDP(buffer)
 
 	if err != nil {
@@ -139,6 +146,7 @@ func ToIPAndPort(address string) (string, int32) {
 
 	if len(ipAndPort) != 2 {
 		Logger.Log(Logger.ERROR, "Invalid parameters to convert to IP and Port!")
+		panic("Invalid parameters to convert to IP and Port!")
 		os.Exit(-1)
 	}
 
@@ -146,6 +154,7 @@ func ToIPAndPort(address string) (string, int32) {
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Invalid parameters to convert Port!")
+		panic("Invalid parameters to convert Port!")
 		os.Exit(-1)
 	}
 
@@ -206,20 +215,4 @@ func WriteToConn(conn net.Conn, message *Raft.Raft) error {
 	Logger.LogWithHost(Logger.INFO, host, "Message sent")
 
 	return nil
-}
-
-// EstablishConnection Establishes a TCP connection to a specified address
-// The address is represented in a format like so IP:PORT
-func EstablishConnection(address string) net.Conn {
-	Logger.Log(Logger.INFO, "Establishing a connection with node...")
-	defer Logger.Log(Logger.INFO, "Connection established with node")
-
-	conn, err := net.DialTimeout("tcp", address, time.Second*6)
-
-	if err != nil {
-		Logger.Log(Logger.ERROR, err.Error())
-		os.Exit(-1)
-	}
-
-	return conn
 }

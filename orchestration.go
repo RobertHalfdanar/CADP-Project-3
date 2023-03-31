@@ -158,6 +158,7 @@ func main() {
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to locate config file!")
+		panic("Failed to locate config file!")
 		os.Exit(-1)
 	}
 
@@ -189,8 +190,8 @@ func main() {
 
 	//simulateSuspend()
 
-	//simulateOneSuspend()
-	simulation()
+	simulateOneSuspend()
+	//simulation()
 }
 
 var commands []string
@@ -203,6 +204,7 @@ func initCommands() {
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to locate config file!")
+		panic("Failed to locate config file!")
 		os.Exit(-1)
 	}
 
@@ -288,7 +290,7 @@ func simulateOneSuspend() {
 			server.sendCommand("print")
 		}
 
-		if currentTime.Sub(timer2).Seconds() > 30 {
+		if currentTime.Sub(timer2).Seconds() > 80 {
 			servers[3].sendCommand("resume")
 			break
 		}
