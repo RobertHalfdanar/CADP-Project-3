@@ -23,7 +23,7 @@ func (state *State) printCommandHandler() {
 		dataColumnLength = len(state.Servers)*3 + 4
 	}
 
-	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s \n"
+	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s │\n"
 
 	// Change this print to a table
 	columns := []string{"My address", "Current term", "Voted for", "State", "Commit index", "Last applied", "Next index", "Match index"}
