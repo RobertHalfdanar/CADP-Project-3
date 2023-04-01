@@ -143,10 +143,13 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 	state.NextIndex = make([]uint64, len(state.Servers))
 	state.MatchIndex = make([]uint64, len(state.Servers))
 
+	myIndex := Utils.IndexOf(state.Servers, state.MyAddress)
+
 	for i := range state.NextIndex {
 		state.NextIndex[i] = uint64(len(state.Log) + 1)
 		state.MatchIndex[i] = 0
 	}
+	state.MatchIndex[myIndex] = state.NextIndex[myIndex] - 1
 
 	state.state = Leader
 
