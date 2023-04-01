@@ -20,7 +20,6 @@ type Server struct {
 var listener *net.UDPConn
 
 // Send sends a message to the server, the server is specified in the Server struct
-// if the server is not available, it will print an error message.
 func (node *Server) Send(msg *Raft.Raft) {
 
 	// Send the message to the server

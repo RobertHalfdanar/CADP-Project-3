@@ -14,6 +14,7 @@ resume
 suspend
 */
 
+// printCommandHandler is a function that prints out the state of the server
 func (state *State) printCommandHandler() {
 
 	dataColumnLength := 16
@@ -44,6 +45,7 @@ func (state *State) printCommandHandler() {
 	fmt.Printf("└──────────────────┴" + strings.Repeat("─", dataColumnLength+2) + "┘\n")
 }
 
+// logCommandHandler prints out the log file of the server
 func (state *State) logCommandHandler() {
 
 	filenamePath := "./" + "server-" + strings.Replace(state.MyName, ":", "-", 1) + ".log"
@@ -62,6 +64,7 @@ func (state *State) logCommandHandler() {
 	}
 }
 
+// resumeCommandHandler resumes the server if he is in a failed state
 func (state *State) resumeCommandHandler() {
 
 	if state.state != Failed {
@@ -73,6 +76,7 @@ func (state *State) resumeCommandHandler() {
 	fmt.Println("\033[32mThis server is resumed\033[0m")
 }
 
+// suspendCommandHandler sets the server's state to Failed
 func (state *State) suspendCommandHandler() {
 
 	if state.state == Failed {
