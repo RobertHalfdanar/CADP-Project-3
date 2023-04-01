@@ -79,7 +79,7 @@ type State struct {
 
 // resetToFollower resets the state of the server to follower.
 // It also resets the term to the given term.
-func (state *State) resetToFollower(newTerm uint64) RaftState {
+func (state *State) resetToFollower(newTerm uint64) {
 	state.state = Follower
 	state.CurrentTerm = newTerm
 	state.VotedFor = nil
@@ -153,10 +153,10 @@ func (state *State) Init() {
 func (state *State) commitEntry() {
 	Logger.Log(Logger.INFO, "Committing entry...")
 
-	// Our implementation of Raft LastApplied is a pointer to the last log entry.
+	// Our implementation of Raft LastApplied is a pointer to the last log in the file.
 	// It is always trying to catch up to the commit index.
 	// This is because if the server has been suspended for a while, it might have missed some entries.
-	// And needs to receive them before applying them.
+	// And needs to receive them before committing and then applying them.
 	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
 		log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied].Term, state.Log[state.LastApplied].Index, state.Log[state.LastApplied].CommandName))
 	}

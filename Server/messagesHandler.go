@@ -52,26 +52,26 @@ func (state *State) commandMessageHandler(command string) {
 func (state *State) upToDate(index uint64, term uint64) bool {
 	if len(state.Log) == 0 {
 		// My logs are empty, then I am not up-to-date
-		return false // true
+		return false
 	}
 
 	if state.Log[len(state.Log)-1].Term < term {
 		// The other server last log term is higher the mine, I am not up-to-date
-		return false // true
+		return false
 	} else if state.Log[len(state.Log)-1].Term > term {
 		// The other server last log term is lower the mine, I am up-to-date
-		return true // false
+		return true
 	}
 
 	if uint64(len(state.Log)) > index {
 		// I have more logs than the other server, I am up-to-date
-		return true // false
+		return true
 	} else if uint64(len(state.Log)) < index {
 		// I have fewer logs than the other server, I am not up-to-date
-		return false // true
+		return false
 	}
 
-	return false // true
+	return false
 }
 
 // requestVoteMessageHandler handles a request vote message from another server
@@ -189,15 +189,13 @@ func (state *State) commitEntries(request *Raft.AppendEntriesRequest) {
 		newEntry = request.Entries[0]
 	}
 
-	// If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-	// TODO: This was failing
+	// set commitIndex = min(leaderCommit, index of last new entry)
 	if request.LeaderCommit < newEntry.Index {
 		// The new entry has not been committed
 		state.CommitIndex = request.LeaderCommit
 	} else {
 		state.CommitIndex = newEntry.Index
 	}
-
 	state.commitEntry()
 }
 
@@ -218,8 +216,6 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		state.state = Follower
 	}
 
-	// I have received a message from the leader, I reset the server I voted for
-	state.VotedFor = nil
 	state.leader = address
 
 	if request.Term < state.CurrentTerm {
