@@ -23,8 +23,11 @@ Once you have Go installed, follow these steps to execute it:
 
 **Running Orchestrator**
 
-    <RÓBERT INSERT EXECUTING STEPS HERE>
+    This program requires that a config file name "config.local.txt"
+    in the project root directory.
+    To run the orchestrator, run the following command:
 
+    go run orchestrator.go
 **Notes**
 
 The orchestrator will write the outputs of his servers <br>
