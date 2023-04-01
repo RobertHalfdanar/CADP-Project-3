@@ -276,7 +276,7 @@ func (state *State) Server() {
 		}
 
 		if state.state == Follower {
-			// If the sate is Leader add random delay to the deadline,
+			// If the State is Leader add random delay to the deadline,
 			// so that the leader election is not triggered at the same time for all the servers
 			randomDelay := time.Duration(rand.Int31n(RandomTimeoutMax-RandomTimeoutMin)+RandomTimeoutMin) * time.Millisecond
 			deadline = ElectionTimeout + randomDelay

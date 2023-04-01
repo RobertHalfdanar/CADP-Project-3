@@ -46,9 +46,9 @@ func (state *State) upToDate(index uint64, term uint64) bool {
 		return true
 	}
 
-	if state.Log[state.CommitIndex-1].Term < term {
+	if state.Log[len(state.Log)-1].Term < term {
 		return true
-	} else if state.Log[state.CommitIndex-1].Term > term {
+	} else if state.Log[len(state.Log)-1].Term > term {
 		return false
 	}
 
@@ -72,7 +72,7 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		// If the request term is less than the current term, then we reject the request
 		raftResponse.VoteGranted = false
 
-	} else if state.upToDate(request.LastLogIndex, request.LastLogTerm) {
+	} else if (state.VotedFor == nil || state.VotedFor.String() == address.String()) && state.upToDate(request.LastLogIndex, request.LastLogTerm) {
 		// We vote for the candidate
 		state.CurrentTerm = request.Term
 		state.state = Follower
@@ -83,6 +83,10 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		raftResponse.VoteGranted = true
 	} else {
 		raftResponse.VoteGranted = false
+	}
+
+	if request.Term > state.CurrentTerm {
+		state.state = Follower
 	}
 
 	envelope := &Raft.Raft{}
@@ -134,6 +138,7 @@ func (state *State) requestVoteResponseMessageHandler(response *Raft.RequestVote
 func (state *State) AppendEntriesFails(address *net.UDPAddr) {
 	appendEntriesResponse := &Raft.AppendEntriesResponse{}
 	appendEntriesResponse.Term = state.CurrentTerm
+	appendEntriesResponse.Success = false
 
 	state.sendTo(
 		address,
@@ -239,6 +244,11 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	}
 
 	if response.Success == false {
+		if response.Term > state.CurrentTerm {
+			state.state = Follower
+			return
+		}
+
 		state.NextIndex[addressIndex]--
 		return
 	}
