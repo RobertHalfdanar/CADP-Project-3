@@ -22,7 +22,6 @@ const (
 	RandomTimeoutMin = 150
 )
 
-// States of the Server, cf figure 4
 type RaftState int
 
 const (
@@ -46,7 +45,7 @@ func (e RaftState) String() string {
 	case Failed:
 		return "Failed"
 	}
-	return "Unknown"
+	panic("Unknown RaftState")
 }
 
 type Entry = Raft.LogEntry
@@ -65,7 +64,7 @@ type State struct {
 	state RaftState // The state we are in
 
 	MyName    string         // Given name
-	MyAddress *net.UDPAddr   // Address we listen on
+	MyAddress *net.UDPAddr   // The Address we listen on
 	Listener  *net.UDPConn   // Connection we listen on
 	Servers   []*net.UDPAddr // List of all servers
 
@@ -78,55 +77,29 @@ type State struct {
 	lock sync.RWMutex
 }
 
-func (state *State) getState() RaftState {
-	state.lock.RLock()
-	defer state.lock.RUnlock()
-
-	return state.state
+// resetToFollower resets the state of the server to follower.
+// It also resets the term to the given term.
+func (state *State) resetToFollower(newTerm uint64) RaftState {
+	state.state = Follower
+	state.CurrentTerm = newTerm
+	state.VotedFor = nil
+	state.MatchIndex = make([]uint64, len(state.Servers))
+	state.NextIndex = make([]uint64, len(state.Servers))
 }
 
-/*
-	type Timer struct {
-		timer time.Duration
-		lock  sync.Mutex
-	}
-
-var timer Timer
-
-	func (timer *Timer) increaseTimer(amount time.Duration) {
-		timer.lock.Lock()
-		defer timer.lock.Unlock()
-
-		timer.timer += amount
-	}
-
-	func (timer *Timer) resetTimer(random bool) {
-		timer.lock.Lock()
-		defer timer.lock.Unlock()
-
-		if random {
-			stuff := rand.Int31n(300-150) + 150
-			timer.timer = ElectionTimeout - time.Duration(stuff)*time.Millisecond
-		} else {
-			timer.timer = 0
-		}
-	}
-
-	func (timer *Timer) getTimer() time.Duration {
-		timer.lock.Lock()
-		defer timer.lock.Unlock()
-
-		return timer.timer
-	}
-*/
+// setServers reads a configuration file and populates the server array.
+// It also checks if itself is in the configuration file.
+// The parameter is the name of the configuration file.
 func (state *State) setServers(fileName string) {
 	file, err := os.OpenFile("./"+fileName, os.O_RDONLY, 0644)
+
+	// If we receive an error closing the files, it will probably be because the file is already closed,
+	// and can then ignore the error
 	defer file.Close()
 
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to locate config file!")
 		panic("Failed to locate config file")
-		os.Exit(-1)
 	}
 
 	isInFile := false
@@ -145,23 +118,20 @@ func (state *State) setServers(fileName string) {
 	if isInFile == false {
 		Logger.Log(Logger.ERROR, "Self not in configuration file!")
 		panic("Self not in configuration file")
-		os.Exit(-1)
 	}
 }
 
+// Init initialises the state of the server.
 func (state *State) Init() {
-	// TODO: Initialize the state, setup UDP listener and read the server list.
 	Logger.Log(Logger.INFO, "Initialising state of server...")
 	defer Logger.Log(Logger.INFO, "Server initialized")
 
 	if len(os.Args) < 3 {
 		Logger.Log(Logger.ERROR, "Too few arguments")
 		panic("Too few arguments")
-		os.Exit(-1)
 	} else if len(os.Args) > 3 {
 		Logger.Log(Logger.ERROR, "Too few arguments")
 		panic("Too many arguments")
-		os.Exit(-1)
 	}
 
 	state.MyName = os.Args[1]
@@ -175,18 +145,25 @@ func (state *State) Init() {
 	if err != nil {
 		Logger.Log(Logger.ERROR, "Failed to create a udp listener!")
 		panic("Failed to create a udp listener!")
-		os.Exit(-1)
 	}
 }
 
+// commitEntry will apply all entries up to the commit index.
+// When server applies an entry, it will log the comment
 func (state *State) commitEntry() {
 	Logger.Log(Logger.INFO, "Committing entry...")
 
+	// Our implementation of Raft LastApplied is a pointer to the last log entry.
+	// It is always trying to catch up to the commit index.
+	// This is because if the server has been suspended for a while, it might have missed some entries.
+	// And needs to receive them before applying them.
 	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
 		log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied].Term, state.Log[state.LastApplied].Index, state.Log[state.LastApplied].CommandName))
 	}
 }
 
+// sendHeartbeat sends a heartbeat to all other servers.
+// If a server is missing a log entry, it will send one missing entry.
 func (state *State) sendHeartbeat() {
 	Logger.Log(Logger.INFO, "Sending Heartbeat...")
 	envelope := &Raft.Raft{}
@@ -194,6 +171,7 @@ func (state *State) sendHeartbeat() {
 	envelope.Message = innerEnvelope
 
 	for i, server := range state.Servers {
+		// Reset the struct for each server
 		message := &Raft.AppendEntriesRequest{
 			Term:         state.CurrentTerm,
 			LeaderCommit: state.CommitIndex,
@@ -203,18 +181,21 @@ func (state *State) sendHeartbeat() {
 			Entries:      []*Raft.LogEntry{},
 		}
 
+		// I don't want to send a heartbeat to myself
 		if state.MyName == server.String() {
 			continue
 		}
 
 		message.PrevLogIndex = state.NextIndex[i] - 1
 
+		// In the Raft message array start at 1, but the log array starts at 0,
+		// we then need to subtract 1 from the index to get the correct entry
 		if uint64(len(state.Log)) > message.PrevLogIndex-1 {
 			message.PrevLogTerm = state.Log[message.PrevLogIndex-1].Term
 		}
 
+		// If the server is missing a log entry, add them to the message
 		if uint64(len(state.Log)) > state.NextIndex[i]-1 {
-
 			message.Entries = append(message.Entries, state.Log[state.NextIndex[i]-1])
 		}
 
@@ -224,51 +205,22 @@ func (state *State) sendHeartbeat() {
 	}
 }
 
-/*
-
-func (state *State) flush() {
-	start := time.Now()
-	for {
-		elapsed := time.Since(start)
-		timer.increaseTimer(elapsed)
-		switch state.getState() {
-		case Follower:
-			if timer.getTimer() >= ElectionTimeout {
-				state.startLeaderElection()
-				timer.resetTimer(false)
-			}
-		case Leader:
-			if timer.getTimer() >= BroadcastTime {
-				state.sendHeartbeat()
-				timer.resetTimer(false)
-			}
-		case Candidate:
-			if timer.getTimer() >= BroadcastTime {
-				state.resendRequestVoteMessage()
-
-				timer.resetTimer(false)
-			}
-		}
-
-		start = time.Now()
-		time.Sleep(1 * time.Millisecond)
-	}
-}
-*/
-
+// Server is the main loop of the server. It will listen for commands and requests.
+// And handle them accordingly.
 func (state *State) Server() {
-
-	// TODO: Configure timeouts, read from the UDP connection, handle incoming messages and update state.
-
 	Logger.Log(Logger.INFO, "Server listening...")
 
 	failures := 0
 	var deadline time.Duration
-	for {
+	msg := &Raft.Raft{}
 
+	for {
+		// If the server command that will have an effect on it state it will change the state before handling requests
+
+		// Check if a command has been sent through the CLI
 		select {
 		case cmd := <-command:
-			// If I have received command handel it before reading requests
+			// I have received a command handel it before reading requests
 			state.commandsHandler(cmd)
 			hasFinishedExecutingCommand <- true
 		default:
@@ -276,7 +228,7 @@ func (state *State) Server() {
 		}
 
 		if state.state == Follower {
-			// If the State is Leader add random delay to the deadline,
+			// I am a follower, I need to add random daley to my time
 			// so that the leader election is not triggered at the same time for all the servers
 			randomDelay := time.Duration(rand.Int31n(RandomTimeoutMax-RandomTimeoutMin)+RandomTimeoutMin) * time.Millisecond
 			deadline = ElectionTimeout + randomDelay
@@ -284,21 +236,29 @@ func (state *State) Server() {
 			deadline = BroadcastTime
 		}
 
-		msg := &Raft.Raft{}
+		// Check if the server has received a request
 		address, err := Utils.ReadFromUDPConn(state.Listener, msg, deadline)
 
 		if err != nil {
 			if os.IsTimeout(err) {
+				// The server has not received a request, before the set deadline
 				switch state.state {
 				case Follower:
+					// I have not received a heartbeat; before the set deadline,
+					// there seems to be no leader, I am going to start a leader election
 					state.startLeaderElection()
 				case Leader:
+					// I need to send a heartbeat to all the other servers
 					state.sendHeartbeat()
 				case Candidate:
+					// I have not received a vote from the majority of the servers before the set deadline
 					state.resendRequestVoteMessage()
 				}
 			} else {
 				Logger.Log(Logger.WARNING, "Failed to read from UDP listener")
+
+				// We allow server to fail 3 times before stopping them
+				// This is to avoid the server to stop if the network is not stable
 				failures++
 
 				if failures == 3 {
@@ -307,16 +267,20 @@ func (state *State) Server() {
 				}
 			}
 
+			// This is not a valid request, continue to the next iteration
 			continue
 		}
-
+		// If the server has received a valid request, reset the number of failures
 		failures = 0
 
 		Logger.Log(Logger.INFO, "Message from address: "+address.String())
+
 		state.messagesHandler(msg, address)
 	}
 }
 
+// sendTo sends a message to a specific server.
+// The message is Raft struct and will be marshalled before being sent.
 func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
 
 	err := Utils.WriteToUDPConn(state.Listener, addr, message)
@@ -326,6 +290,7 @@ func (state *State) sendTo(addr *net.UDPAddr, message *Raft.Raft) {
 	}
 }
 
+// sendToAll sends a message to all the other servers.
 func (state *State) sendToAll(message *Raft.Raft) {
 	for _, addr := range state.Servers {
 		if addr.String() == state.MyName {
@@ -340,6 +305,7 @@ func (state *State) sendToAll(message *Raft.Raft) {
 	}
 }
 
+// resendRequestVoteMessage is used to resend the request vote message to the servers that have not voted yet.
 func (state *State) resendRequestVoteMessage() {
 
 	Logger.Log(Logger.INFO, "Resending request vote message...")
@@ -364,11 +330,12 @@ func (state *State) resendRequestVoteMessage() {
 	}
 }
 
+// startLeaderElection is used to start a leader election.
+// It will set the state to candidate and send a request vote message to all the other servers.
 func (state *State) startLeaderElection() {
-
 	Logger.Log(Logger.INFO, "Starting leader election...")
 
-	// Every time we start a new election we reset the server that have not voted yet
+	// Every time we start a new election, we reset the server that has not voted yet
 	state.leftToVote = nil
 	for _, server := range state.Servers {
 		// I have voted for me, so remove me
@@ -391,7 +358,6 @@ func (state *State) startLeaderElection() {
 		lastLogTerm = state.Log[lastLogIndex-1].Term
 	}
 
-	// Issue a request vote to all other servers
 	message := &Raft.Raft{Message: &Raft.Raft_RequestVoteRequest{RequestVoteRequest: &Raft.RequestVoteRequest{
 		Term:          state.CurrentTerm,
 		CandidateName: state.MyName,
@@ -405,8 +371,9 @@ func (state *State) startLeaderElection() {
 	state.sendToAll(message)
 }
 
+// Repl is an interface for the user to interact with the server through the commandline.
+// It will send the commandString to the commandString channel and wait for the commandString to be executed.
 func (state *State) repl() {
-
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -426,6 +393,7 @@ func (state *State) repl() {
 	}
 }
 
+// loggerInit is used to initialize the logger.
 func (state *State) loggerInit() {
 	filename := "./" + "server-" + strings.Replace(state.MyName, ":", "-", 1) + ".log"
 
@@ -455,7 +423,6 @@ func Start() {
 
 	state.Init()
 	state.loggerInit()
-	//go state.flush()
 	go state.repl()
 
 	state.Server()

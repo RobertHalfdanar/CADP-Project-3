@@ -304,6 +304,7 @@ func simulateOneSuspend() {
 	time.Sleep(10 * time.Second)
 
 	for _, server := range servers {
+		server.sendCommand("suspend")
 		server.sendCommand("print")
 	}
 
