@@ -17,13 +17,13 @@ suspend
 // printCommandHandler is a function that prints out the state of the server
 func (state *State) printCommandHandler() {
 
-	dataColumnLength := 16
+	dataColumnLength := 30
 
-	if len(state.Servers)*3 > 16 && state.state == Leader {
-		dataColumnLength = len(state.Servers)*2 + 4
+	if len(state.Servers)*3 > 20 && state.state == Leader {
+		dataColumnLength = len(state.Servers)*3 + 4
 	}
 
-	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s │\n"
+	format := "│ %-16s │ %-" + fmt.Sprintf("%d", dataColumnLength) + "s \n"
 
 	// Change this print to a table
 	columns := []string{"My address", "Current term", "Voted for", "State", "Commit index", "Last applied", "Next index", "Match index"}
