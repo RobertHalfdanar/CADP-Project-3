@@ -89,10 +89,12 @@ func (state *State) requestVoteMessageHandler(request *Raft.RequestVoteRequest, 
 		state.resetToFollower(request.Term)
 	}
 
+	// Reply false if term < currentTerm (§5.1)
 	if request.Term < state.CurrentTerm {
 		// The request term is less than my current term, we reject the request
 		raftResponse.VoteGranted = false
-
+		// If votedFor is null or candidateId, and candidate’s log is at
+		// least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
 	} else if (state.VotedFor == nil || state.VotedFor.String() == address.String()) && !state.upToDate(request.LastLogIndex, request.LastLogTerm) {
 		// Candidate is up-to-date, and we haven't voted yet, or we have voted for the candidate
 		// We vote for the candidate
@@ -179,6 +181,7 @@ func (state *State) newEntry(request *Raft.AppendEntriesRequest) {
 	if newEntry.Index <= uint64(len(state.Log)) && state.Log[newEntry.Index-1].Term != newEntry.Term {
 		state.Log[newEntry.Index-1] = newEntry
 	} else {
+		// Append any new entries not already in the log
 		state.Log = append(state.Log, newEntry)
 	}
 }
@@ -221,11 +224,14 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 
 	state.leader = address
 
+	// Reply false if term < currentTerm (§5.1)
 	if request.Term < state.CurrentTerm {
 		// The request term is lower than the current term. I will not accept the request
 
 		Logger.Log(Logger.INFO, "Append entries not successful, mismatching term")
 		state.appendEntriesFails(address)
+
+		// Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
 	} else if request.PrevLogIndex > 0 {
 		if uint64(len(state.Log)) <= request.PrevLogIndex-1 {
 			// I have fewer logs
@@ -245,7 +251,8 @@ func (state *State) appendEntriesRequestMessageHandler(request *Raft.AppendEntri
 		state.newEntry(request)
 	}
 
-	// I will update the current term
+	// If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
+	// it converted to a follower in the beginning of the function
 	state.CurrentTerm = request.Term
 
 	// If the leaderCommit is greater than the commitIndex, I will commit the entries
@@ -278,11 +285,13 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 	if !response.Success {
 		// The appendEntriesRequest was not successful, I will decrement the nextIndex and try again
 		// The sever is missing logs
+		// If AppendEntries fails because of log inconsistency: decrement nextIndex and retry (§5.3)
 		state.NextIndex[addressIndex]--
 		return
 	}
 
 	// The request was successful, I will update the matchIndex and nextIndex
+	// If successful: update nextIndex and matchIndex for follower (§5.3)
 	state.MatchIndex[addressIndex] = state.NextIndex[addressIndex]
 	state.NextIndex[addressIndex]++
 
@@ -303,6 +312,8 @@ func (state *State) appendEntriesResponseMessageHandler(response *Raft.AppendEnt
 
 	majority := int(math.Floor(float64(len(state.Servers))/2.0)) + 1
 
+	// If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+	// 	set commitIndex = N (§5.3, §5.4).
 	for k, v := range countIndex {
 		if v >= majority && k > leaderCommitIndex {
 			// The majority of servers have the same matchIndex, It is the new commit log index

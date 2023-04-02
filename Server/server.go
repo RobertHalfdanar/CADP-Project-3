@@ -157,6 +157,8 @@ func (state *State) commitEntry() {
 	// It is always trying to catch up to the commit index.
 	// This is because if the server has been suspended for a while, it might have missed some entries.
 	// And needs to receive them before committing and then applying them.
+
+	// If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine (§5.3)
 	for ; state.LastApplied < state.CommitIndex && state.LastApplied < uint64(len(state.Log)); state.LastApplied++ {
 		log.Println(fmt.Sprintf("%d,%d,%s", state.Log[state.LastApplied].Term, state.Log[state.LastApplied].Index, state.Log[state.LastApplied].CommandName))
 	}
@@ -249,6 +251,8 @@ func (state *State) Server() {
 					state.startLeaderElection()
 				case Leader:
 					// I need to send a heartbeat to all the other servers
+					// Upon election: send initial empty AppendEntries RPCs
+					// (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
 					state.sendHeartbeat()
 				case Candidate:
 					// I have not received a vote from the majority of the servers before the set deadline
